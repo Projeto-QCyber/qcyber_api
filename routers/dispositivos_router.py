@@ -9,7 +9,6 @@ from database import get_cursor
 
 router = APIRouter(
     prefix="/dispositivos",
-    # A dependência aqui garante que todas as rotas neste arquivo exigirão um token válido
     dependencies=[Depends(security.oauth2_scheme)] 
 )
 
@@ -18,8 +17,7 @@ def read_dispositivos(cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
     """Busca e retorna a lista de todos os dispositivos cadastrados."""
     try:
         cursor.execute("SELECT id, nome, host, localizacao, status, data_cadastro FROM dispositivos ORDER BY nome ASC")
-        dispositivos = cursor.fetchall()
-        return dispositivos
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar dispositivos: {e}")
 
@@ -30,7 +28,6 @@ def create_dispositivo(
 ):
     """Cadastra um novo dispositivo no banco de dados."""
     try:
-        # Verifica se o host já existe
         cursor.execute("SELECT id FROM dispositivos WHERE host = %s", (dispositivo.host,))
         if cursor.fetchone():
             raise HTTPException(
@@ -42,11 +39,10 @@ def create_dispositivo(
         cursor.execute(sql, (dispositivo.nome, dispositivo.host, dispositivo.localizacao))
         new_id = cursor.lastrowid
 
-        # Busca o registro recém-criado para retornar o objeto completo
         cursor.execute("SELECT id, nome, host, localizacao, status, data_cadastro FROM dispositivos WHERE id = %s", (new_id,))
         new_dispositivo = cursor.fetchone()
 
-        cursor.connection.commit() # Salva as alterações no banco
+        cursor.connection.commit()
 
         return new_dispositivo
 

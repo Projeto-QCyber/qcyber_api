@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 # --- Schemas de Token ---
@@ -23,7 +23,7 @@ class UserInDB(UserBase):
     senha_hash: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # ATUALIZADO de orm_mode
 
 # --- Schemas de Dispositivo ---
 class DispositivoBase(BaseModel):
@@ -40,4 +40,4 @@ class Dispositivo(DispositivoBase):
     data_cadastro: datetime
 
     class Config:
-        orm_mode = True # Permite que o Pydantic leia dados de objetos (como os do ORM)
+        from_attributes = True # ATUALIZADO de orm_mode

@@ -13,7 +13,6 @@ app = FastAPI(
 )
 
 # Configuração do CORS (Cross-Origin Resource Sharing)
-# Permite que o frontend (rodando em outra porta/domínio) acesse a API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Em produção, restrinja para o domínio do seu frontend
@@ -23,7 +22,6 @@ app.add_middleware(
 )
 
 # Inclui os roteadores na aplicação principal
-# Cada roteador gerencia um conjunto de endpoints relacionados
 app.include_router(login_router.router, tags=["Autenticação"])
 app.include_router(dispositivos_router.router, tags=["Dispositivos"])
 

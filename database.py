@@ -4,10 +4,7 @@ from config import settings
 from fastapi import HTTPException
 
 def get_db_connection():
-    """
-    Cria e retorna uma conexão com o banco de dados.
-    Esta é uma implementação simples. Em produção, considere usar um pool de conexões.
-    """
+    """Cria e retorna uma conexão com o banco de dados."""
     try:
         connection = pymysql.connect(
             host=settings.MYSQL_HOST,
@@ -15,7 +12,7 @@ def get_db_connection():
             password=settings.MYSQL_PASSWORD,
             database=settings.MYSQL_DB,
             charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor  # Retorna resultados como dicionários
+            cursorclass=pymysql.cursors.DictCursor
         )
         return connection
     except Exception as e:
@@ -23,10 +20,7 @@ def get_db_connection():
         return None
 
 def get_cursor():
-    """
-    Dependência FastAPI para obter um cursor de banco de dados.
-    Garante que a conexão seja fechada após o uso.
-    """
+    """Dependência FastAPI para obter um cursor de banco de dados."""
     connection = get_db_connection()
     if connection is None:
         raise HTTPException(

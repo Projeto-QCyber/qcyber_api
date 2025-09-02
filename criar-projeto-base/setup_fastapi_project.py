@@ -2,9 +2,11 @@
 """
 Script para gerar a estrutura de pastas e arquivos para o novo projeto qCyber FastAPI.
 
+Este script já está corrigido para ser compatível com Pydantic V2 e FastAPI recentes.
+
 Ao ser executado, este script criará a seguinte estrutura:
 .
-├── .env_example
+├── .env
 ├── requirements.txt
 ├── main.py
 ├── config.py
@@ -24,19 +26,19 @@ import os
 # --- CONTEÚDO DOS ARQUIVOS ---
 
 # Dicionário onde a chave é o caminho do arquivo e o valor é o seu conteúdo.
-# Usamos strings raw (r''') para evitar problemas com caracteres especiais.
 project_files = {
 
     "requirements.txt": r'''fastapi
 uvicorn[standard]
 pydantic
+pydantic-settings
 python-dotenv
 PyMySQL
 passlib[bcrypt]
 python-jose[cryptography]
 ''',
 
-    ".env_example": r'''# --- CONFIGURAÇÕES DO BANCO DE DADOS ---
+    ".env": r'''# --- CONFIGURAÇÕES DO BANCO DE DADOS ---
 # Renomeie este arquivo para .env e preencha com seus dados
 MYSQL_HOST=localhost
 MYSQL_USER=root
@@ -65,7 +67,6 @@ app = FastAPI(
 )
 
 # Configuração do CORS (Cross-Origin Resource Sharing)
-# Permite que o frontend (rodando em outra porta/domínio) acesse a API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Em produção, restrinja para o domínio do seu frontend
@@ -75,7 +76,6 @@ app.add_middleware(
 )
 
 # Inclui os roteadores na aplicação principal
-# Cada roteador gerencia um conjunto de endpoints relacionados
 app.include_router(login_router.router, tags=["Autenticação"])
 app.include_router(dispositivos_router.router, tags=["Dispositivos"])
 
@@ -90,30 +90,25 @@ def read_root():
 ''',
 
     "config.py": r'''# -*- coding: utf-8 -*-
-import os
-from dotenv import load_dotenv
-from pydantic import BaseSettings
-
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """
-    Classe para gerenciar as configurações da aplicação.
-    O Pydantic lê automaticamente as variáveis de ambiente.
+    Classe para gerenciar as configurações da aplicação a partir de variáveis de ambiente.
     """
     # Configurações do Banco de Dados
-    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_USER: str = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "root")
-    MYSQL_DB: str = os.getenv("MYSQL_DB", "qcyberDB")
+    MYSQL_HOST: str
+    MYSQL_USER: str
+    MYSQL_PASSWORD: str
+    MYSQL_DB: str
 
     # Configurações de Segurança (JWT)
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "default_secret")
-    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+    SECRET_KEY: str
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     class Config:
+        env_file = ".env"  # Especifica o arquivo .env a ser lido
         case_sensitive = True
 
 # Instância única das configurações para ser usada em toda a aplicação
@@ -122,7 +117,7 @@ settings = Settings()
 
     "schemas.py": r'''# -*- coding: utf-8 -*-
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 # --- Schemas de Token ---
@@ -145,7 +140,7 @@ class UserInDB(UserBase):
     senha_hash: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # ATUALIZADO de orm_mode
 
 # --- Schemas de Dispositivo ---
 class DispositivoBase(BaseModel):
@@ -162,7 +157,7 @@ class Dispositivo(DispositivoBase):
     data_cadastro: datetime
 
     class Config:
-        orm_mode = True # Permite que o Pydantic leia dados de objetos (como os do ORM)
+        from_attributes = True # ATUALIZADO de orm_mode
 ''',
 
     "security.py": r'''# -*- coding: utf-8 -*-
@@ -173,15 +168,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import ValidationError
 
 from config import settings
 from schemas import TokenData
 
-# Esquema de segurança que define como o token será buscado (no header "Authorization: Bearer <token>")
+# Esquema de segurança que define como o token será buscado
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/token")
 
-# Contexto para hashing de senhas, usando o algoritmo bcrypt
+# Contexto para hashing de senhas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -211,10 +205,7 @@ from config import settings
 from fastapi import HTTPException
 
 def get_db_connection():
-    """
-    Cria e retorna uma conexão com o banco de dados.
-    Esta é uma implementação simples. Em produção, considere usar um pool de conexões.
-    """
+    """Cria e retorna uma conexão com o banco de dados."""
     try:
         connection = pymysql.connect(
             host=settings.MYSQL_HOST,
@@ -222,7 +213,7 @@ def get_db_connection():
             password=settings.MYSQL_PASSWORD,
             database=settings.MYSQL_DB,
             charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor  # Retorna resultados como dicionários
+            cursorclass=pymysql.cursors.DictCursor
         )
         return connection
     except Exception as e:
@@ -230,10 +221,7 @@ def get_db_connection():
         return None
 
 def get_cursor():
-    """
-    Dependência FastAPI para obter um cursor de banco de dados.
-    Garante que a conexão seja fechada após o uso.
-    """
+    """Dependência FastAPI para obter um cursor de banco de dados."""
     connection = get_db_connection()
     if connection is None:
         raise HTTPException(
@@ -271,11 +259,9 @@ def login_for_access_token(
     Verifica as credenciais e retorna um token JWT.
     """
     try:
-        # Busca o usuário pelo email
         cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
         user = cursor.fetchone()
 
-        # Verifica se o usuário existe e se a senha está correta
         if not user or not security.verify_password(form_data.password, user["senha_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -283,14 +269,12 @@ def login_for_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Verifica se o usuário está ativo
         if not user.get('ativo', True):
              raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuário inativo.",
             )
 
-        # Cria o token de acesso
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = security.create_access_token(
             data={"sub": user["email"]}, expires_delta=access_token_expires
@@ -299,7 +283,6 @@ def login_for_access_token(
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:
-        # Evita expor detalhes de erros internos
         print(f"Erro no login: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -318,7 +301,6 @@ from database import get_cursor
 
 router = APIRouter(
     prefix="/dispositivos",
-    # A dependência aqui garante que todas as rotas neste arquivo exigirão um token válido
     dependencies=[Depends(security.oauth2_scheme)] 
 )
 
@@ -327,8 +309,7 @@ def read_dispositivos(cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
     """Busca e retorna a lista de todos os dispositivos cadastrados."""
     try:
         cursor.execute("SELECT id, nome, host, localizacao, status, data_cadastro FROM dispositivos ORDER BY nome ASC")
-        dispositivos = cursor.fetchall()
-        return dispositivos
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar dispositivos: {e}")
 
@@ -339,7 +320,6 @@ def create_dispositivo(
 ):
     """Cadastra um novo dispositivo no banco de dados."""
     try:
-        # Verifica se o host já existe
         cursor.execute("SELECT id FROM dispositivos WHERE host = %s", (dispositivo.host,))
         if cursor.fetchone():
             raise HTTPException(
@@ -351,11 +331,10 @@ def create_dispositivo(
         cursor.execute(sql, (dispositivo.nome, dispositivo.host, dispositivo.localizacao))
         new_id = cursor.lastrowid
 
-        # Busca o registro recém-criado para retornar o objeto completo
         cursor.execute("SELECT id, nome, host, localizacao, status, data_cadastro FROM dispositivos WHERE id = %s", (new_id,))
         new_dispositivo = cursor.fetchone()
 
-        cursor.connection.commit() # Salva as alterações no banco
+        cursor.connection.commit()
 
         return new_dispositivo
 
@@ -367,23 +346,18 @@ def create_dispositivo(
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 ''',
 
-    # Adiciona um __init__.py vazio para que a pasta 'routers' seja um módulo Python
     "routers/__init__.py": ""
 }
 
 
 def create_project_structure():
-    """
-    Função principal que cria as pastas e arquivos do projeto.
-    """
+    """Função principal que cria as pastas e arquivos do projeto."""
     print("🚀 Iniciando a criação da estrutura do projeto qCyber FastAPI...")
 
-    # Cria o diretório 'routers' se ele não existir
-    if not os.path.exists('routers'):
+    if not os.path.exists('../routers'):
         print("   -> Criando diretório: routers/")
-        os.makedirs('routers')
+        os.makedirs('../routers')
 
-    # Itera sobre o dicionário de arquivos e os cria
     for file_path, content in project_files.items():
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -395,12 +369,14 @@ def create_project_structure():
 
     print("\n🎉 Estrutura do projeto criada com sucesso!")
     print("\n--- PRÓXIMOS PASSOS ---")
-    print("1. Crie seu arquivo de ambiente: cp .env_example .env")
-    print("2. Edite o arquivo .env com suas credenciais do banco e uma SECRET_KEY forte.")
-    print("3. Instale as dependências: pip install -r requirements.txt")
-    print("4. Execute a API: uvicorn main:app --reload --port 8000")
-    print("5. Acesse a documentação interativa em: http://127.0.0.1:8000/docs")
+    print("1. Apague a estrutura antiga, se houver.")
+    print("2. Crie seu arquivo de ambiente: cp .env .env")
+    print("3. Edite o arquivo .env com suas credenciais e uma SECRET_KEY forte.")
+    print("4. Instale as dependências: pip install -r requirements.txt")
+    print("5. Execute a API: uvicorn main:app --reload --port 8000")
+    print("6. Acesse a documentação interativa em: http://127.0.0.1:8000/docs")
 
 
 if __name__ == "__main__":
     create_project_structure()
+

@@ -23,11 +23,9 @@ def login_for_access_token(
     Verifica as credenciais e retorna um token JWT.
     """
     try:
-        # Busca o usuário pelo email
         cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
         user = cursor.fetchone()
 
-        # Verifica se o usuário existe e se a senha está correta
         if not user or not security.verify_password(form_data.password, user["senha_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,14 +33,12 @@ def login_for_access_token(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Verifica se o usuário está ativo
         if not user.get('ativo', True):
              raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Usuário inativo.",
             )
 
-        # Cria o token de acesso
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = security.create_access_token(
             data={"sub": user["email"]}, expires_delta=access_token_expires
@@ -51,7 +47,6 @@ def login_for_access_token(
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:
-        # Evita expor detalhes de erros internos
         print(f"Erro no login: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

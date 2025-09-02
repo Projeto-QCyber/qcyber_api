@@ -6,15 +6,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import ValidationError
 
 from config import settings
 from schemas import TokenData
 
-# Esquema de segurança que define como o token será buscado (no header "Authorization: Bearer <token>")
+# Esquema de segurança que define como o token será buscado
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/token")
 
-# Contexto para hashing de senhas, usando o algoritmo bcrypt
+# Contexto para hashing de senhas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
