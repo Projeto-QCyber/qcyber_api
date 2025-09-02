@@ -1,2 +1,0 @@
-# qcyber_api
-
