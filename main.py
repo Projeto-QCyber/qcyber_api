@@ -1,0 +1,37 @@
+# -*- coding: utf-8 -*-
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# Importa os roteadores dos diferentes módulos
+from routers import login_router, dispositivos_router
+
+# Cria a instância principal da aplicação FastAPI
+app = FastAPI(
+    title="qCyber Security API",
+    description="API para monitoramento de segurança e análise de detecções.",
+    version="1.0.0"
+)
+
+# Configuração do CORS (Cross-Origin Resource Sharing)
+# Permite que o frontend (rodando em outra porta/domínio) acesse a API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Em produção, restrinja para o domínio do seu frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Inclui os roteadores na aplicação principal
+# Cada roteador gerencia um conjunto de endpoints relacionados
+app.include_router(login_router.router, tags=["Autenticação"])
+app.include_router(dispositivos_router.router, tags=["Dispositivos"])
+
+
+@app.get("/", tags=["Root"])
+def read_root():
+    """Endpoint inicial para verificar se a API está online."""
+    return {"message": "Bem-vindo à qCyber Security API!"}
+
+# Para executar a aplicação:
+# uvicorn main:app --reload --port 8000
