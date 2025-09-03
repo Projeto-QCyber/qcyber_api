@@ -18,8 +18,8 @@ Ao ser executado, este script criará a seguinte estrutura:
     ├── dispositivos_router.py
     └── login_router.py
 
-Basta salvar este arquivo como 'setup_fastapi_project.py' e executá-lo com:
-python setup_fastapi_project.py
+Basta salvar este arquivo como 'fastapi_creat_base_project.py' e executá-lo com:
+python fastapi_creat_base_project.py
 """
 import os
 
