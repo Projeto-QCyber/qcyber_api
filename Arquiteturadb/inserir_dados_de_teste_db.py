@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import random
 
+
 def get_lookup_ids(cursor, table_name):
     """
     Busca IDs e nomes de uma tabela de lookup e retorna um dicionário
@@ -20,6 +21,7 @@ def get_lookup_ids(cursor, table_name):
     """
     cursor.execute(f"SELECT id, nome FROM {table_name}")
     return {row['nome']: row['id'] for row in cursor.fetchall()}
+
 
 def seed_data():
     """Conecta ao banco e insere os dados de exemplo."""
@@ -63,7 +65,8 @@ def seed_data():
                 ('Servidor de Aplicação Principal', '192.168.1.10', 'Data Center A', status_disp_ids.get('Ativo')),
                 ('Servidor de Banco de Dados', '192.168.1.15', 'Data Center A', status_disp_ids.get('Ativo')),
                 ('Estação de Trabalho - Finanças', '10.0.5.22', 'Escritório Central', status_disp_ids.get('Ativo')),
-                ('Gateway de Rede', '192.168.0.1', 'Sala de Servidores', status_disp_ids.get('Em Manutenção'))
+                ('Gateway de Rede', '192.168.0.1', 'Sala de Servidores', status_disp_ids.get('Ativo'))
+                # Alterado para Ativo para gerar dados
             ]
             dispositivo_ids = {}
             for nome, host, localizacao, status_id in dispositivos:
@@ -82,8 +85,14 @@ def seed_data():
 
             print("\nPASSO 2: Inserindo incidentes analisados...")
             incidentes = [
-                ('Tentativa de Acesso SSH Anômala', status_inc_ids.get('Resolvido'), dispositivo_ids.get('Servidor de Aplicação Principal'), risco_ids.get('Crítico'), datetime.now() - timedelta(days=2), '...', '...', json.dumps(["Ação A", "Ação B"])),
-                ('Tráfego Incomum para Porta de Banco de Dados', status_inc_ids.get('Em Análise'), dispositivo_ids.get('Servidor de Banco de Dados'), risco_ids.get('Alto'), datetime.now() - timedelta(days=1), '...', '...', json.dumps(["Ação C"]))
+                ('Tentativa de Acesso SSH Anômala', status_inc_ids.get('Resolvido'),
+                 dispositivo_ids.get('Servidor de Aplicação Principal'), risco_ids.get('Crítico'),
+                 datetime.now() - timedelta(days=2), 'Tentativas de login falhas a partir do IP 189.45.3.1',
+                 'O LLM identificou o IP como malicioso.', json.dumps(["Bloquear IP", "Rotacionar credenciais"])),
+                ('Tráfego Incomum para Porta de Banco de Dados', status_inc_ids.get('Em Análise'),
+                 dispositivo_ids.get('Servidor de Banco de Dados'), risco_ids.get('Alto'),
+                 datetime.now() - timedelta(days=1), 'Múltiplas conexões na porta 1433 de fontes não usuais.',
+                 'Pode ser uma tentativa de brute force.', json.dumps(["Analisar logs do firewall"]))
             ]
             incidente_ids = {}
             for titulo, status_id, disp_id, risco_id, data_det, resumo, llm, acoes in incidentes:
@@ -91,7 +100,9 @@ def seed_data():
                 result = cursor.fetchone()
                 if not result:
                     cursor.execute(
-                        """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id, data_deteccao, resumo_tecnico, explicacao_llm, acoes_recomendadas)
+                        """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
+                                                              data_deteccao, resumo_tecnico, explicacao_llm,
+                                                              acoes_recomendadas)
                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                         (titulo, status_id, disp_id, risco_id, data_det, resumo, llm, acoes)
                     )
@@ -101,38 +112,57 @@ def seed_data():
                     incidente_ids[titulo] = result['id']
             conn.commit()
 
-            print("\nPASSO 3: Inserindo detecções individuais...")
+            print("\nPASSO 3: Gerando e inserindo detecções com timestamps dinâmicos...")
             deteccoes = [
-                # Cenário 1: Detecção que foi escalada para um incidente manual
-                (dispositivo_ids.get('Servidor de Aplicação Principal'), 7, label_map['Password'], 'Múltiplas tentativas...', status_resp_ids.get('Análise Manual Necessária'), None, None, None, incidente_ids.get('Tentativa de Acesso SSH Anômala')),
-                # Cenário 2: Detecção CRÍTICA com ação automática e parâmetro
-                (dispositivo_ids.get('Gateway de Rede'), 0, label_map['Backdoor'], 'Dispositivo contactando C2...', status_resp_ids.get('Ação Automática Executada'), acao_ids.get('BLOCK_IP'), '203.11.5.88', datetime.now() - timedelta(minutes=10), None),
-                 # Cenário 3: Outra ação automática
-                (dispositivo_ids.get('Estação de Trabalho - Finanças'), 9, label_map['Ransomware'], 'Processo suspeito de criptografia...', status_resp_ids.get('Ação Automática Executada'), acao_ids.get('ISOLATE_HOST'), '10.0.5.22', datetime.now() - timedelta(hours=1), None),
-                # Cenário 4: Detecções pendentes de análise
-                (dispositivo_ids.get('Estação de Trabalho - Finanças'), 13, label_map['XSS'], 'Usuário acessou URL phishing.', status_resp_ids.get('Pendente'), None, None, None, None),
-                (dispositivo_ids.get('Servidor de Banco de Dados'), 10, label_map['SQL_injection'], 'Query com padrões suspeitos.', status_resp_ids.get('Pendente'), None, None, None, None),
-                # Cenário 5: Detecção ignorada (falso positivo)
-                (dispositivo_ids.get('Servidor de Aplicação Principal'), 99, label_map['Normal'], 'Tráfego HTTP normal.', status_resp_ids.get('Ignorado'), None, None, None, None),
+                (dispositivo_ids.get('Servidor de Aplicação Principal'), 7, label_map['Password'],
+                 'Múltiplas tentativas...', status_resp_ids.get('Análise Manual Necessária'), None, None, None,
+                 incidente_ids.get('Tentativa de Acesso SSH Anômala')),
+                (dispositivo_ids.get('Gateway de Rede'), 0, label_map['Backdoor'], 'Dispositivo contactando C2...',
+                 status_resp_ids.get('Ação Automática Executada'), acao_ids.get('BLOCK_IP'), '203.11.5.88',
+                 datetime.now() - timedelta(minutes=10), None),
+                (dispositivo_ids.get('Estação de Trabalho - Finanças'), 9, label_map['Ransomware'],
+                 'Processo suspeito de criptografia...', status_resp_ids.get('Ação Automática Executada'),
+                 acao_ids.get('ISOLATE_HOST'), '10.0.5.22', datetime.now() - timedelta(hours=1), None),
+                (dispositivo_ids.get('Estação de Trabalho - Finanças'), 13, label_map['XSS'],
+                 'Usuário acessou URL phishing.', status_resp_ids.get('Pendente'), None, None, None, None),
+                (dispositivo_ids.get('Servidor de Banco de Dados'), 10, label_map['SQL_injection'],
+                 'Query com padrões suspeitos.', status_resp_ids.get('Pendente'), None, None, None, None),
+                (dispositivo_ids.get('Servidor de Aplicação Principal'), 99, label_map['Normal'],
+                 'Tráfego HTTP normal.', status_resp_ids.get('Ignorado'), None, None, None, None),
             ]
 
-            tipos_ataque_random = [0, 1, 5, 8, 9]
-            for _ in range(5):
+            tipos_ataque_random = [0, 1, 5, 8, 9, 10, 12, 13]
+            # Aumentado para 50 para ter mais dados para os gráficos
+            for _ in range(50):
                 disp_nome = random.choice(list(dispositivo_ids.keys()))
                 disp_id = dispositivo_ids[disp_nome]
                 ataque_id = random.choice(tipos_ataque_random)
-                deteccoes.append((disp_id, ataque_id, ataque_id, f'Atividade suspeita de ataque código {ataque_id} detectada.', status_resp_ids.get('Pendente'), None, None, None, None))
+                deteccoes.append(
+                    (disp_id, ataque_id, ataque_id, f'Atividade suspeita de ataque código {ataque_id} detectada.',
+                     status_resp_ids.get('Pendente'), None, None, None, None))
 
             cursor.execute("TRUNCATE TABLE deteccoes")
             print("  - Tabela 'deteccoes' limpa.")
 
-            for disp_id, pred, tipo_id, relatorio, status_id, acao_id, acao_param, data_acao, inc_id in deteccoes:
-                 cursor.execute(
-                    """INSERT INTO deteccoes (dispositivo_id, predicao, tipo_ataque_id, relatorio_api, status_resposta_id, acao_executada_id, acao_parametro, data_acao_executada, incidente_id)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                    (disp_id, pred, tipo_id, relatorio, status_id, acao_id, acao_param, data_acao, inc_id)
-                 )
-            print(f"  - {len(deteccoes)} novas detecções inseridas.")
+            # --- LÓGICA DE INSERÇÃO ATUALIZADA ---
+            start_time = datetime.now() - timedelta(days=7)
+
+            # Usamos enumerate para ter um contador (i) para espalhar o tempo
+            for i, (disp_id, pred, tipo_id, relatorio, status_id, acao_id, acao_param, data_acao, inc_id) in enumerate(
+                    deteccoes):
+                # Calcula um timestamp dinâmico para cada registro
+                dynamic_timestamp = start_time + timedelta(hours=i * 2, minutes=random.randint(0, 120))
+
+                # Adicionamos a coluna 'data_deteccao' ao INSERT
+                cursor.execute(
+                    """INSERT INTO deteccoes (data_deteccao, dispositivo_id, predicao, tipo_ataque_id, relatorio_api,
+                                              status_resposta_id, acao_executada_id, acao_parametro,
+                                              data_acao_executada, incidente_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (dynamic_timestamp, disp_id, pred, tipo_id, relatorio, status_id, acao_id, acao_param, data_acao,
+                     inc_id)
+                )
+            print(f"  - {len(deteccoes)} novas detecções inseridas com timestamps distribuídos.")
 
             conn.commit()
             print("\n🎉 Dados de exemplo inseridos com sucesso!")
@@ -144,6 +174,7 @@ def seed_data():
         if conn:
             conn.close()
 
+
 if __name__ == '__main__':
     print("Este script irá inserir dados de exemplo no banco 'qcyberDB' (versão normalizada).")
     resposta = input("Deseja continuar? (s/N): ")
@@ -151,4 +182,3 @@ if __name__ == '__main__':
         seed_data()
     else:
         print("Operação cancelada.")
-
