@@ -26,6 +26,9 @@ def login_for_access_token(
         cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
         user = cursor.fetchone()
 
+        # DEBUG: Adicione este print para ver o que está vindo do banco
+        # print(f"--- DADOS DO USUÁRIO DO BANCO --- \n{user}\n---------------------------------")
+
         if not user or not security.verify_password(form_data.password, user["senha_hash"]):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

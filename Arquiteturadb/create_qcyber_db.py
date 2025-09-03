@@ -4,15 +4,15 @@ Script para recriar o banco de dados do projeto qCyber. (VERSÃO COM NORMALIZAÇ
 
 Este script implementa a normalização para campos ENUM e tipos de ataque,
 criando tabelas de lookup (enum_*) para maior flexibilidade e performance.
+Este script foca APENAS na criação da estrutura (schemas e tabelas).
 """
 import os
 import pymysql
-import hashlib
 from dotenv import load_dotenv
 
-def hash_password(password):
-    """Gera o hash de uma senha usando SHA256."""
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+# A função de hash e a importação do passlib/hashlib foram removidas,
+# pois não são mais necessárias neste script.
 
 def recreate_database():
     """Recria o banco de dados qcyberDB completamente."""
@@ -21,7 +21,7 @@ def recreate_database():
     db_name = os.getenv('MYSQL_DB', 'qcyberDB')
 
     print("=" * 60)
-    print("RECRIACAO DO BANCO DE DADOS - PROJETO QCYBER (NORMALIZADO)")
+    print("CRIAÇÃO DA ESTRUTURA DO BANCO DE DADOS - PROJETO QCYBER")
     print("=" * 60)
 
     try:
@@ -52,12 +52,13 @@ def recreate_database():
 
             # Tabela para Tipos de Ataque
             cursor.execute("""
-                CREATE TABLE enum_tipo_ataque (
-                    id INT PRIMARY KEY,
-                    nome VARCHAR(100) NOT NULL UNIQUE,
-                    descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_tipo_ataque
+                           (
+                               id        INT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             label_map = {
                 'Backdoor': 0, 'DDoS_HTTP': 1, 'DDoS_ICMP': 2, 'DDoS_TCP': 3, 'DDoS_UDP': 4,
                 'Fingerprinting': 5, 'MITM': 6, 'Password': 7, 'Port_Scanning': 8, 'Ransomware': 9,
@@ -70,10 +71,13 @@ def recreate_database():
 
             # Tabela para Status de Resposta
             cursor.execute("""
-                CREATE TABLE enum_status_resposta (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL UNIQUE, descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_status_resposta
+                           (
+                               id        INT AUTO_INCREMENT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             status_resposta = [
                 ('Pendente', 'Detecção aguardando triagem.'),
                 ('Ação Automática Executada', 'Sistema executou uma ação de contenção.'),
@@ -85,10 +89,13 @@ def recreate_database():
 
             # Tabela para Status de Incidente
             cursor.execute("""
-                CREATE TABLE enum_status_incidente (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL UNIQUE, descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_status_incidente
+                           (
+                               id        INT AUTO_INCREMENT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             status_incidente = [
                 ('Aberto', 'Incidente recém-criado, aguardando análise inicial.'),
                 ('Em Análise', 'Incidente está sendo ativamente investigado.'),
@@ -100,10 +107,13 @@ def recreate_database():
 
             # Tabela para Nível de Risco
             cursor.execute("""
-                CREATE TABLE enum_nivel_risco (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL UNIQUE, descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_nivel_risco
+                           (
+                               id        INT AUTO_INCREMENT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             niveis_risco = [
                 ('Baixo', 'Impacto mínimo, geralmente informativo.'),
                 ('Médio', 'Requer atenção, mas não é uma ameaça imediata.'),
@@ -115,24 +125,31 @@ def recreate_database():
 
             # Tabela para Status de Dispositivo
             cursor.execute("""
-                CREATE TABLE enum_status_dispositivo (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL UNIQUE, descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_status_dispositivo
+                           (
+                               id        INT AUTO_INCREMENT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             status_dispositivo = [
                 ('Ativo', 'Dispositivo online e monitorado.'),
                 ('Inativo', 'Dispositivo offline.'),
                 ('Em Manutenção', 'Dispositivo temporariamente fora de monitoramento para manutenção.')
             ]
-            cursor.executemany("INSERT INTO enum_status_dispositivo (nome, descricao) VALUES (%s, %s)", status_dispositivo)
+            cursor.executemany("INSERT INTO enum_status_dispositivo (nome, descricao) VALUES (%s, %s)",
+                               status_dispositivo)
             print("✅ Tabela 'enum_status_dispositivo' criada e populada.")
 
             # NOVA Tabela para Ações Executadas
             cursor.execute("""
-                CREATE TABLE enum_acao_executada (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL UNIQUE, descricao TEXT
-                ) ENGINE=InnoDB;
-            """)
+                           CREATE TABLE enum_acao_executada
+                           (
+                               id        INT AUTO_INCREMENT PRIMARY KEY,
+                               nome      VARCHAR(100) NOT NULL UNIQUE,
+                               descricao TEXT
+                           ) ENGINE=InnoDB;
+                           """)
             acoes_executadas = [
                 ('BLOCK_IP', 'Bloqueia um endereço de IP específico na firewall.'),
                 ('ISOLATE_HOST', 'Coloca o dispositivo em uma rede de quarentena.'),
@@ -147,71 +164,108 @@ def recreate_database():
             print("\nPASSO 4: Criando tabelas principais com chaves estrangeiras...")
 
             cursor.execute("""
-                CREATE TABLE usuarios (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL, email VARCHAR(100) NOT NULL UNIQUE,
-                    senha_hash VARCHAR(255) NOT NULL, ativo BOOLEAN DEFAULT TRUE, is_admin BOOLEAN DEFAULT FALSE,
-                    tem_permissao_sistema BOOLEAN DEFAULT TRUE, email_verificado BOOLEAN DEFAULT FALSE,
-                    dois_fatores_ativo BOOLEAN DEFAULT FALSE, data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_email (email)
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE usuarios
+                           (
+                               id                    INT AUTO_INCREMENT PRIMARY KEY,
+                               nome                  VARCHAR(100) NOT NULL,
+                               email                 VARCHAR(100) NOT NULL UNIQUE,
+                               senha_hash            VARCHAR(255) NOT NULL,
+                               ativo                 BOOLEAN   DEFAULT TRUE,
+                               is_admin              BOOLEAN   DEFAULT FALSE,
+                               tem_permissao_sistema BOOLEAN   DEFAULT TRUE,
+                               email_verificado      BOOLEAN   DEFAULT FALSE,
+                               dois_fatores_ativo    BOOLEAN   DEFAULT FALSE,
+                               data_criacao          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               INDEX                 idx_email (email)
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'usuarios' criada.")
 
             cursor.execute("""
-                CREATE TABLE log_atividades_usuarios (
-                    id INT AUTO_INCREMENT PRIMARY KEY, data_ocorrencia TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    usuario_ator_id INT NOT NULL, usuario_alvo_id INT NOT NULL, tipo_acao VARCHAR(50) NOT NULL,
-                    detalhes TEXT, FOREIGN KEY (usuario_ator_id) REFERENCES usuarios(id),
-                    FOREIGN KEY (usuario_alvo_id) REFERENCES usuarios(id)
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE log_atividades_usuarios
+                           (
+                               id              INT AUTO_INCREMENT PRIMARY KEY,
+                               data_ocorrencia TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               usuario_ator_id INT         NOT NULL,
+                               usuario_alvo_id INT         NOT NULL,
+                               tipo_acao       VARCHAR(50) NOT NULL,
+                               detalhes        TEXT,
+                               FOREIGN KEY (usuario_ator_id) REFERENCES usuarios (id),
+                               FOREIGN KEY (usuario_alvo_id) REFERENCES usuarios (id)
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'log_atividades_usuarios' criada.")
 
             cursor.execute("""
-                CREATE TABLE qcyber_analises_vqc (
-                    id INT AUTO_INCREMENT PRIMARY KEY, data_analise TIMESTAMP DEFAULT CURRENT_TIMESTAMP, acuracia FLOAT,
-                    tp INT, tn INT, fp INT, fn INT, is_alerta BOOLEAN DEFAULT FALSE
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE qcyber_analises_vqc
+                           (
+                               id           INT AUTO_INCREMENT PRIMARY KEY,
+                               data_analise TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               acuracia     FLOAT,
+                               tp           INT,
+                               tn           INT,
+                               fp           INT,
+                               fn           INT,
+                               is_alerta    BOOLEAN   DEFAULT FALSE
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'qcyber_analises_vqc' (legada) mantida.")
 
             cursor.execute("""
-                CREATE TABLE dispositivos (
-                    id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(100) NOT NULL, host VARCHAR(100) NOT NULL UNIQUE,
-                    localizacao VARCHAR(255), status_id INT, data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (status_id) REFERENCES enum_status_dispositivo(id)
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE dispositivos
+                           (
+                               id            INT AUTO_INCREMENT PRIMARY KEY,
+                               nome          VARCHAR(100) NOT NULL,
+                               host          VARCHAR(100) NOT NULL UNIQUE,
+                               localizacao   VARCHAR(255),
+                               status_id     INT,
+                               data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               FOREIGN KEY (status_id) REFERENCES enum_status_dispositivo (id)
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'dispositivos' (normalizada) criada.")
 
             cursor.execute("""
-                CREATE TABLE incidentes_analisados (
-                    id INT AUTO_INCREMENT PRIMARY KEY, data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    titulo VARCHAR(255) NOT NULL, status_id INT, dispositivo_id INT NOT NULL,
-                    nivel_risco_id INT, data_deteccao DATETIME NOT NULL, resumo_tecnico TEXT NOT NULL,
-                    explicacao_llm TEXT, acoes_recomendadas JSON,
-                    FOREIGN KEY (status_id) REFERENCES enum_status_incidente(id),
-                    FOREIGN KEY (nivel_risco_id) REFERENCES enum_nivel_risco(id),
-                    FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE incidentes_analisados
+                           (
+                               id                 INT AUTO_INCREMENT PRIMARY KEY,
+                               data_criacao       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               titulo             VARCHAR(255) NOT NULL,
+                               status_id          INT,
+                               dispositivo_id     INT          NOT NULL,
+                               nivel_risco_id     INT,
+                               data_deteccao      DATETIME     NOT NULL,
+                               resumo_tecnico     TEXT         NOT NULL,
+                               explicacao_llm     TEXT,
+                               acoes_recomendadas JSON,
+                               FOREIGN KEY (status_id) REFERENCES enum_status_incidente (id),
+                               FOREIGN KEY (nivel_risco_id) REFERENCES enum_nivel_risco (id),
+                               FOREIGN KEY (dispositivo_id) REFERENCES dispositivos (id) ON DELETE CASCADE
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'incidentes_analisados' (normalizada) criada.")
 
             cursor.execute("""
-                CREATE TABLE deteccoes (
-                    id INT AUTO_INCREMENT PRIMARY KEY, data_deteccao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    dispositivo_id INT NOT NULL, predicao INT NOT NULL, tipo_ataque_id INT NOT NULL,
-                    relatorio_api TEXT, status_resposta_id INT,
-                    acao_executada_id INT NULL COMMENT 'ID da ação da tabela enum_acao_executada',
-                    acao_parametro VARCHAR(255) NULL COMMENT 'Parâmetro para a ação. Ex: o IP a ser bloqueado',
-                    data_acao_executada TIMESTAMP NULL, incidente_id INT NULL,
-                    FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE,
-                    FOREIGN KEY (tipo_ataque_id) REFERENCES enum_tipo_ataque(id),
-                    FOREIGN KEY (status_resposta_id) REFERENCES enum_status_resposta(id),
-                    FOREIGN KEY (acao_executada_id) REFERENCES enum_acao_executada(id),
-                    FOREIGN KEY (incidente_id) REFERENCES incidentes_analisados(id) ON DELETE SET NULL
-                ) ENGINE=InnoDB
-            """)
+                           CREATE TABLE deteccoes
+                           (
+                               id                  INT AUTO_INCREMENT PRIMARY KEY,
+                               data_deteccao       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               dispositivo_id      INT NOT NULL,
+                               predicao            INT NOT NULL,
+                               tipo_ataque_id      INT NOT NULL,
+                               relatorio_api       TEXT,
+                               status_resposta_id  INT,
+                               acao_executada_id   INT NULL COMMENT 'ID da ação da tabela enum_acao_executada',
+                               acao_parametro      VARCHAR(255) NULL COMMENT 'Parâmetro para a ação. Ex: o IP a ser bloqueado',
+                               data_acao_executada TIMESTAMP NULL,
+                               incidente_id        INT NULL,
+                               FOREIGN KEY (dispositivo_id) REFERENCES dispositivos (id) ON DELETE CASCADE,
+                               FOREIGN KEY (tipo_ataque_id) REFERENCES enum_tipo_ataque (id),
+                               FOREIGN KEY (status_resposta_id) REFERENCES enum_status_resposta (id),
+                               FOREIGN KEY (acao_executada_id) REFERENCES enum_acao_executada (id),
+                               FOREIGN KEY (incidente_id) REFERENCES incidentes_analisados (id) ON DELETE SET NULL
+                           ) ENGINE=InnoDB
+                           """)
             print("✅ Tabela 'deteccoes' (normalizada) criada.")
 
         conn.commit()
@@ -226,11 +280,13 @@ def recreate_database():
         if 'conn' in locals() and conn.open:
             conn.close()
 
-    if verify_database():
-        create_default_users()
-    else:
+    # A chamada para criar usuários foi removida daqui.
+    # O script agora termina após a verificação.
+    if not verify_database():
         return False
+
     return True
+
 
 def verify_database():
     """Verifica se o banco de dados e as tabelas foram criados corretamente."""
@@ -256,63 +312,22 @@ def verify_database():
                 print(f"  - {table}")
 
         conn.close()
-        print("\n🎉 SUCESSO: BANCO DE DADOS RECRIADO COM SUCESSO!")
+        print("\n🎉 SUCESSO: ESTRUTURA DO BANCO DE DADOS RECRIADA COM SUCESSO!")
         return True
     except Exception as e:
         print(f"❌ ERRO na verificação: {e}")
         return False
 
-def create_default_users():
-    """Cria os usuários padrão: administrador e usuário de teste."""
-    print("\nPASSO 6: Criando usuários padrão...")
 
-    load_dotenv()
-    db_name = os.getenv('MYSQL_DB', 'qcyberDB')
-
-    try:
-        conn = pymysql.connect(
-            host=os.getenv('MYSQL_HOST', 'localhost'),
-            user=os.getenv('MYSQL_USER', 'root'),
-            password=os.getenv('MYSQL_PASSWORD', 'root'),
-            database=db_name,
-            charset='utf8mb4'
-        )
-        with conn.cursor() as cursor:
-            admin_email = 'admin@qcyber.local'
-            cursor.execute("SELECT id FROM usuarios WHERE email = %s", (admin_email,))
-            if not cursor.fetchone():
-                senha_hashed = hash_password('admin123456')
-                cursor.execute(
-                    """INSERT INTO usuarios (nome, email, senha_hash, is_admin, tem_permissao_sistema, email_verificado)
-                       VALUES (%s, %s, %s, %s, %s, %s)""",
-                    ('Administrador do Sistema', admin_email, senha_hashed, True, True, True))
-                print(f"✅ Usuário Administrador criado: {admin_email}")
-
-            test_email = 'usuario@teste.com'
-            cursor.execute("SELECT id FROM usuarios WHERE email = %s", (test_email,))
-            if not cursor.fetchone():
-                senha_hashed = hash_password('123456')
-                cursor.execute(
-                    """INSERT INTO usuarios (nome, email, senha_hash, is_admin, tem_permissao_sistema, email_verificado, dois_fatores_ativo)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                    ('Usuario de Teste', test_email, senha_hashed, False, True, True, False))
-                print(f"✅ Usuário de Teste criado: {test_email}")
-
-        conn.commit()
-        conn.close()
-        return True
-
-    except Exception as e:
-        print(f"❌ ERRO ao criar usuários padrão: {e}")
-        return False
+# A função create_default_users() foi completamente removida.
 
 if __name__ == '__main__':
-    print("ATENÇÃO: Este script irá apagar e recriar o banco de dados 'qcyberDB'!")
+    print("ATENÇÃO: Este script irá apagar e recriar a ESTRUTURA do banco de dados 'qcyberDB'!")
+    print("         NENHUM usuário será criado.")
     resposta = input("Você tem certeza que deseja continuar? (s/N): ")
 
     if resposta.lower() in ['s', 'sim', 'y', 'yes']:
         if recreate_database():
-            print("\n🚀 Tudo pronto para começar!")
+            print("\n🚀 Estrutura do banco de dados pronta!")
     else:
         print("Operação cancelada pelo usuário.")
-

@@ -16,6 +16,9 @@ class UserBase(BaseModel):
     email: EmailStr
     nome: str
 
+class UserCreate(UserBase):
+    senha: str
+
 class UserInDB(UserBase):
     id: int
     ativo: bool

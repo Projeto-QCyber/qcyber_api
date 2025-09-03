@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Importa os roteadores dos diferentes módulos
-from routers import login_router, dispositivos_router
+from routers import login_router, dispositivos_router, usuarios_router
 
 # Cria a instância principal da aplicação FastAPI
 app = FastAPI(
@@ -24,6 +24,7 @@ app.add_middleware(
 # Inclui os roteadores na aplicação principal
 app.include_router(login_router.router, tags=["Autenticação"])
 app.include_router(dispositivos_router.router, tags=["Dispositivos"])
+app.include_router(usuarios_router.router, tags=["Usuários"]) # <--- E ADICIONE ESTA LINHA
 
 
 @app.get("/", tags=["Root"])
