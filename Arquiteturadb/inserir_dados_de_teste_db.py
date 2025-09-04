@@ -66,21 +66,22 @@ def seed_data():
                 ('Servidor de Banco de Dados', '192.168.1.15', 'Data Center A', status_disp_ids.get('Ativo')),
                 ('Estação de Trabalho - Finanças', '10.0.5.22', 'Escritório Central', status_disp_ids.get('Ativo')),
                 ('Gateway de Rede', '192.168.0.1', 'Sala de Servidores', status_disp_ids.get('Ativo'))
-                # Alterado para Ativo para gerar dados
             ]
             dispositivo_ids = {}
+            # Limpa a tabela para garantir consistência
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
+            cursor.execute("TRUNCATE TABLE incidentes_analisados;")
+            cursor.execute("TRUNCATE TABLE dispositivos;")
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
+            print("  - Tabelas 'dispositivos' e 'incidentes_analisados' limpas.")
+
             for nome, host, localizacao, status_id in dispositivos:
-                cursor.execute("SELECT id FROM dispositivos WHERE host = %s", (host,))
-                result = cursor.fetchone()
-                if not result:
-                    cursor.execute(
-                        "INSERT INTO dispositivos (nome, host, localizacao, status_id) VALUES (%s, %s, %s, %s)",
-                        (nome, host, localizacao, status_id)
-                    )
-                    dispositivo_ids[nome] = cursor.lastrowid
-                    print(f"  - Dispositivo '{nome}' inserido.")
-                else:
-                    dispositivo_ids[nome] = result['id']
+                cursor.execute(
+                    "INSERT INTO dispositivos (nome, host, localizacao, status_id) VALUES (%s, %s, %s, %s)",
+                    (nome, host, localizacao, status_id)
+                )
+                dispositivo_ids[nome] = cursor.lastrowid
+                print(f"  - Dispositivo '{nome}' inserido.")
             conn.commit()
 
             print("\nPASSO 2: Inserindo incidentes analisados...")
@@ -96,43 +97,67 @@ def seed_data():
             ]
             incidente_ids = {}
             for titulo, status_id, disp_id, risco_id, data_det, resumo, llm, acoes in incidentes:
-                cursor.execute("SELECT id FROM incidentes_analisados WHERE titulo = %s", (titulo,))
-                result = cursor.fetchone()
-                if not result:
-                    cursor.execute(
-                        """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
-                                                              data_deteccao, resumo_tecnico, explicacao_llm,
-                                                              acoes_recomendadas)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                        (titulo, status_id, disp_id, risco_id, data_det, resumo, llm, acoes)
-                    )
-                    incidente_ids[titulo] = cursor.lastrowid
-                    print(f"  - Incidente '{titulo}' inserido.")
-                else:
-                    incidente_ids[titulo] = result['id']
+                cursor.execute(
+                    """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
+                                                          data_deteccao, resumo_tecnico, explicacao_llm,
+                                                          acoes_recomendadas)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (titulo, status_id, disp_id, risco_id, data_det, resumo, llm, acoes)
+                )
+                incidente_ids[titulo] = cursor.lastrowid
+                print(f"  - Incidente '{titulo}' inserido.")
+
+            # --- NOVA SEÇÃO: Gerando incidentes aleatórios adicionais ---
+            print("\n  - Gerando 20 incidentes aleatórios para popular o gráfico...")
+
+            # Lista ponderada para favorecer riscos mais altos
+            riscos_ponderados = [
+                risco_ids['Crítico'],
+                risco_ids['Alto'], risco_ids['Alto'],
+                risco_ids['Médio'], risco_ids['Médio'], risco_ids['Médio'],
+                risco_ids['Baixo']
+            ]
+            status_possiveis = list(status_inc_ids.values())
+
+            for i in range(20):
+                risco_selecionado_id = random.choice(riscos_ponderados)
+                dispositivo_selecionado_nome = random.choice(list(dispositivo_ids.keys()))
+                dispositivo_selecionado_id = dispositivo_ids[dispositivo_selecionado_nome]
+
+                titulo = f"Incidente Aleatório #{i + 1} em {dispositivo_selecionado_nome}"
+                status_id = random.choice(status_possiveis)
+                # Espalha os incidentes ao longo dos últimos 30 dias
+                data_det = datetime.now() - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
+                resumo = "Evento gerado automaticamente para fins de teste."
+
+                cursor.execute(
+                    """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
+                                                          data_deteccao, resumo_tecnico)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (titulo, status_id, dispositivo_selecionado_id, risco_selecionado_id, data_det, resumo)
+                )
+            print("  - 20 incidentes aleatórios inseridos com sucesso.")
+            # --- FIM DA NOVA SEÇÃO ---
+
             conn.commit()
 
             print("\nPASSO 3: Gerando e inserindo detecções com timestamps dinâmicos...")
-            deteccoes = [
+            cursor.execute("TRUNCATE TABLE deteccoes")
+            print("  - Tabela 'deteccoes' limpa.")
+
+            deteccoes = [  # Adicionado alguns dados fixos para garantir variedade
                 (dispositivo_ids.get('Servidor de Aplicação Principal'), 7, label_map['Password'],
-                 'Múltiplas tentativas...', status_resp_ids.get('Análise Manual Necessária'), None, None, None,
-                 incidente_ids.get('Tentativa de Acesso SSH Anômala')),
+                 'Múltiplas tentativas...', status_resp_ids.get('Análise Manual Necessária'), None, None, None, None),
                 (dispositivo_ids.get('Gateway de Rede'), 0, label_map['Backdoor'], 'Dispositivo contactando C2...',
                  status_resp_ids.get('Ação Automática Executada'), acao_ids.get('BLOCK_IP'), '203.11.5.88',
                  datetime.now() - timedelta(minutes=10), None),
                 (dispositivo_ids.get('Estação de Trabalho - Finanças'), 9, label_map['Ransomware'],
                  'Processo suspeito de criptografia...', status_resp_ids.get('Ação Automática Executada'),
                  acao_ids.get('ISOLATE_HOST'), '10.0.5.22', datetime.now() - timedelta(hours=1), None),
-                (dispositivo_ids.get('Estação de Trabalho - Finanças'), 13, label_map['XSS'],
-                 'Usuário acessou URL phishing.', status_resp_ids.get('Pendente'), None, None, None, None),
-                (dispositivo_ids.get('Servidor de Banco de Dados'), 10, label_map['SQL_injection'],
-                 'Query com padrões suspeitos.', status_resp_ids.get('Pendente'), None, None, None, None),
-                (dispositivo_ids.get('Servidor de Aplicação Principal'), 99, label_map['Normal'],
-                 'Tráfego HTTP normal.', status_resp_ids.get('Ignorado'), None, None, None, None),
             ]
 
+            # Gerando 50 detecções aleatórias
             tipos_ataque_random = [0, 1, 5, 8, 9, 10, 12, 13]
-            # Aumentado para 50 para ter mais dados para os gráficos
             for _ in range(50):
                 disp_nome = random.choice(list(dispositivo_ids.keys()))
                 disp_id = dispositivo_ids[disp_nome]
@@ -141,19 +166,10 @@ def seed_data():
                     (disp_id, ataque_id, ataque_id, f'Atividade suspeita de ataque código {ataque_id} detectada.',
                      status_resp_ids.get('Pendente'), None, None, None, None))
 
-            cursor.execute("TRUNCATE TABLE deteccoes")
-            print("  - Tabela 'deteccoes' limpa.")
-
-            # --- LÓGICA DE INSERÇÃO ATUALIZADA ---
-            start_time = datetime.now() - timedelta(days=7)
-
-            # Usamos enumerate para ter um contador (i) para espalhar o tempo
+            start_time = datetime.now()
             for i, (disp_id, pred, tipo_id, relatorio, status_id, acao_id, acao_param, data_acao, inc_id) in enumerate(
                     deteccoes):
-                # Calcula um timestamp dinâmico para cada registro
-                dynamic_timestamp = start_time + timedelta(hours=i * 2, minutes=random.randint(0, 120))
-
-                # Adicionamos a coluna 'data_deteccao' ao INSERT
+                dynamic_timestamp = start_time - timedelta(hours=i * 2, minutes=random.randint(0, 120))
                 cursor.execute(
                     """INSERT INTO deteccoes (data_deteccao, dispositivo_id, predicao, tipo_ataque_id, relatorio_api,
                                               status_resposta_id, acao_executada_id, acao_parametro,

@@ -88,3 +88,22 @@ class DashboardSummary(BaseModel):
     deteccoes_por_hora: list[DeteccoesPorHora]
     dispositivos_atacados: list[DispositivosAtacados]
     incidentes_por_risco: list[IncidentesPorRisco]
+
+
+
+class AcaoDetail(BaseModel):
+    """Detalhes de uma ação automática executada."""
+    data_acao_executada: datetime
+    acao_parametro: Optional[str] = None
+    nome_acao: str
+
+class IncidenteDetail(BaseModel):
+    """Detalhes de um incidente recente."""
+    titulo: str
+    nivel_risco: str
+    data_criacao: datetime
+
+class DispositivoDetail(BaseModel):
+    """Detalhes de um dispositivo ativo."""
+    nome: str
+    host: str

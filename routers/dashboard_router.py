@@ -7,6 +7,8 @@ from typing import Optional
 import schemas
 from database import get_cursor
 
+from typing import List
+
 router = APIRouter(
     prefix="/dashboard",
     tags=["Dashboard"]
@@ -125,3 +127,103 @@ def get_dashboard_summary(
             dispositivos_atacados=[],
             incidentes_por_risco=[]
         )
+
+
+@router.get("/details/deteccoes", response_model=List[schemas.UltimaDeteccao])
+def get_deteccoes_details(
+    cursor: pymysql.cursors.DictCursor = Depends(get_cursor),
+    start_date: Optional[datetime] = Query(None, description="Data de início (ISO format)"),
+    end_date: Optional[datetime] = Query(None, description="Data de fim (ISO format)")
+):
+    """
+    Retorna uma lista detalhada das últimas 20 detecções para o modal de KPI.
+    """
+    if start_date is None or end_date is None:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=1)
+
+    try:
+        deteccoes_query = """
+        SELECT
+            d.id,
+            d.data_deteccao,
+            disp.nome AS nome_dispositivo,
+            eta.nome AS tipo_ataque,
+            esr.nome AS status_resposta
+        FROM deteccoes d
+        JOIN dispositivos disp ON d.dispositivo_id = disp.id
+        JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
+        JOIN enum_status_resposta esr ON d.status_resposta_id = esr.id
+        WHERE d.data_deteccao BETWEEN %s AND %s
+        ORDER BY d.data_deteccao DESC
+        LIMIT 20;
+        """
+        cursor.execute(deteccoes_query, (start_date, end_date))
+        return cursor.fetchall()
+
+    except Exception as e:
+        print(f"Erro ao buscar detalhes das detecções: {e}")
+        return []
+
+
+@router.get("/details/acoes", response_model=List[schemas.AcaoDetail])
+def get_acoes_details(
+    cursor: pymysql.cursors.DictCursor = Depends(get_cursor),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None)
+):
+    """Retorna as últimas 20 ações automáticas executadas."""
+    if start_date is None or end_date is None:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30) # Busca em um período maior
+    try:
+        query = """
+        SELECT d.data_acao_executada, d.acao_parametro, ea.nome as nome_acao
+        FROM deteccoes d
+        JOIN enum_acao_executada ea ON d.acao_executada_id = ea.id
+        WHERE d.acao_executada_id IS NOT NULL AND d.data_acao_executada BETWEEN %s AND %s
+        ORDER BY d.data_acao_executada DESC
+        LIMIT 20;
+        """
+        cursor.execute(query, (start_date, end_date))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Erro ao buscar detalhes das ações: {e}")
+        return []
+
+@router.get("/details/incidentes", response_model=List[schemas.IncidenteDetail])
+def get_incidentes_details(
+    cursor: pymysql.cursors.DictCursor = Depends(get_cursor),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None)
+):
+    """Retorna os últimos 20 incidentes criados."""
+    if start_date is None or end_date is None:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+    try:
+        query = """
+        SELECT ia.titulo, enr.nome as nivel_risco, ia.data_criacao
+        FROM incidentes_analisados ia
+        JOIN enum_nivel_risco enr ON ia.nivel_risco_id = enr.id
+        WHERE ia.data_criacao BETWEEN %s AND %s
+        ORDER BY ia.data_criacao DESC
+        LIMIT 20;
+        """
+        cursor.execute(query, (start_date, end_date))
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Erro ao buscar detalhes dos incidentes: {e}")
+        return []
+
+@router.get("/details/dispositivos", response_model=List[schemas.DispositivoDetail])
+def get_dispositivos_details(cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
+    """Retorna a lista de dispositivos com status 'Ativo'."""
+    try:
+        # O status_id=1 corresponde a 'Ativo' no seu script de criação do DB
+        query = "SELECT nome, host FROM dispositivos WHERE status_id = 1 ORDER BY nome;"
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Exception as e:
+        print(f"Erro ao buscar detalhes dos dispositivos: {e}")
+        return []
