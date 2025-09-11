@@ -1,29 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-Script para popular o banco de dados qCyber com um grande volume de dados
-de exemplo (mock data), ideal para testes de performance e visualização.
-(VERSÃO FINAL NORMALIZADA E COM VOLUME AMPLIADO)
+Script para popular o banco de dados qCyber com dados de exemplo (mock data)
+que refletem o fluxo de negócio real (detecção -> análise).
+(VERSÃO CORRIGIDA COM VÍNCULO ENTRE DETECÇÕES E INCIDENTES)
 
 Este script:
-1. Limpa completamente as tabelas de dados dinâmicos.
-2. Garante a existência de todos os níveis de risco, incluindo 'Desconhecido'.
-3. Insere um grande volume de incidentes (150) e detecções (200).
-4. Distribui os dados ao longo dos últimos 90 dias.
+1. Limpa as tabelas de dados dinâmicos.
+2. Insere dispositivos.
+3. Para cada detecção criada, decide aleatoriamente se um incidente
+   analisado correspondente deve ser gerado.
+4. Se um incidente é gerado, o `id` dele é usado para atualizar a detecção
+   original, criando o vínculo correto na coluna `incidente_id`.
 """
 import os
 import pymysql
-import json
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import random
-import sys
 
 
 def get_lookup_ids(cursor, table_name):
-    """
-    Busca IDs e nomes de uma tabela de lookup e retorna um dicionário
-    para fácil acesso. Ex: {'Ativo': 1, 'Inativo': 2}
-    """
+    """Busca IDs e nomes de uma tabela de lookup."""
     try:
         cursor.execute(f"SELECT id, nome FROM {table_name}")
         result = cursor.fetchall()
@@ -33,7 +30,7 @@ def get_lookup_ids(cursor, table_name):
         return {row['nome']: row['id'] for row in result}
     except pymysql.Error as e:
         print(f"❌ ERRO ao buscar dados da tabela '{table_name}': {e}")
-        return None  # Retorna None para indicar falha
+        return None
 
 
 def ensure_risk_levels(cursor):
@@ -42,7 +39,6 @@ def ensure_risk_levels(cursor):
     risk_levels = ["Baixo", "Médio", "Alto", "Crítico", "Desconhecido"]
     try:
         for level in risk_levels:
-            # Usamos INSERT IGNORE para evitar erros se o nível já existir
             cursor.execute("INSERT IGNORE INTO enum_nivel_risco (nome) VALUES (%s)", (level,))
         print("  - Níveis de risco garantidos.")
         return True
@@ -89,19 +85,18 @@ def seed_data():
             conn.commit()
 
             print("\nPASSO 1: Carregando IDs das tabelas de Enum...")
-            lookup_tables = {
-                "status_disp_ids": "enum_status_dispositivo",
-                "status_inc_ids": "enum_status_incidente",
-                "risco_ids": "enum_nivel_risco",
-                "status_resp_ids": "enum_status_resposta",
-                "acao_ids": "enum_acao_executada",
+            ids = {
+                "status_disp_ids": get_lookup_ids(cursor, "enum_status_dispositivo"),
+                "status_inc_ids": get_lookup_ids(cursor, "enum_status_incidente"),
+                "risco_ids": get_lookup_ids(cursor, "enum_nivel_risco"),
+                "status_resp_ids": get_lookup_ids(cursor, "enum_status_resposta"),
+                "acao_ids": get_lookup_ids(cursor, "enum_acao_executada"),
             }
-            ids = {}
-            for key, table_name in lookup_tables.items():
-                ids[key] = get_lookup_ids(cursor, table_name)
-                if ids[key] is None or not ids[key]:
+            # Checagem de erro robusta
+            for key, value in ids.items():
+                if value is None or not value:
                     raise Exception(
-                        f"Falha ao carregar ou tabela vazia: '{table_name}'. Popule as tabelas 'enum' primeiro.")
+                        f"Falha ao carregar ou tabela enum vazia para '{key}'. Popule as tabelas 'enum' primeiro.")
 
             print("✅ IDs carregados.")
 
@@ -116,64 +111,76 @@ def seed_data():
                 ('Gateway de Rede', '192.168.0.1', 'Sala de Servidores', ids['status_disp_ids'].get('Ativo')),
                 ('Servidor Web - Legado', '192.168.2.50', 'Data Center B', ids['status_disp_ids'].get('Inativo'))
             ]
-            dispositivo_ids = {}
+            dispositivo_ids_map = {}
             for nome, host, localizacao, status_id in dispositivos_data:
                 cursor.execute("INSERT INTO dispositivos (nome, host, localizacao, status_id) VALUES (%s, %s, %s, %s)",
                                (nome, host, localizacao, status_id))
-                dispositivo_ids[nome] = cursor.lastrowid
-            print(f"  - {len(dispositivo_ids)} dispositivos inseridos.")
+                dispositivo_ids_map[cursor.lastrowid] = nome
+            print(f"  - {len(dispositivo_ids_map)} dispositivos inseridos.")
             conn.commit()
 
-            # PASSO 3: Gerar e Inserir Incidentes
-            print("\nPASSO 3: Gerando e inserindo incidentes analisados...")
+            # --- INÍCIO DA LÓGICA CORRIGIDA ---
+
+            # PASSO 3: Gerar Detecções e, para algumas, seus Incidentes correspondentes
+            print("\nPASSO 3: Gerando detecções e vinculando incidentes analisados...")
+            total_deteccoes = 200
+            incidentes_criados = 0
+            tipos_ataque_random = [0, 1, 5, 6, 7, 8, 9, 10, 12, 13]
             riscos_ponderados = [
                 ids['risco_ids']['Crítico'], ids['risco_ids']['Crítico'],
                 ids['risco_ids']['Alto'], ids['risco_ids']['Alto'], ids['risco_ids']['Alto'],
                 ids['risco_ids']['Médio'], ids['risco_ids']['Médio'],
-                ids['risco_ids']['Baixo'],
-                ids['risco_ids']['Desconhecido']
+                ids['risco_ids']['Baixo']
             ]
-            total_incidentes = 150
-            for i in range(total_incidentes):
-                risco_id = random.choice(riscos_ponderados)
-                disp_nome = random.choice(list(dispositivo_ids.keys()))
-                disp_id = dispositivo_ids[disp_nome]
-                titulo = f"Incidente Aleatório #{i + 1} ({random.choice(['Acesso Anômalo', 'Tráfego Suspeito', 'Alerta de Malware'])})"
-                status_id = random.choice(list(ids['status_inc_ids'].values()))
-                data_det = datetime.now() - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23),
-                                                      minutes=random.randint(0, 59))
 
-                cursor.execute(
-                    """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
-                                                          data_deteccao, resumo_tecnico)
-                       VALUES (%s, %s, %s, %s, %s, %s)""",
-                    (titulo, status_id, disp_id, risco_id, data_det, "Evento gerado automaticamente para teste.")
-                )
-            print(f"  - {total_incidentes} incidentes aleatórios inseridos.")
-            conn.commit()
-
-            # PASSO 4: Gerar e Inserir Detecções
-            print("\nPASSO 4: Gerando e inserindo detecções...")
-            total_deteccoes = 200
-            tipos_ataque_random = [0, 1, 5, 6, 7, 8, 9, 10, 12, 13]
-            start_time = datetime.now()
-            for _ in range(total_deteccoes):
-                disp_id = random.choice(list(dispositivo_ids.values()))
+            for i in range(total_deteccoes):
+                # 1. Cria a detecção
+                disp_id = random.choice(list(dispositivo_ids_map.keys()))
                 ataque_id = random.choice(tipos_ataque_random)
                 status_resp_id = random.choice(list(ids['status_resp_ids'].values()))
-                dynamic_timestamp = start_time - timedelta(hours=random.randint(0, 72), minutes=random.randint(0, 59))
-                relatorio = f'Atividade suspeita de ataque código {ataque_id} detectada no dispositivo.'
+                data_det = datetime.now() - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
+                relatorio = f'Atividade suspeita de ataque código {ataque_id} detectada.'
 
+                # Insere a detecção com incidente_id NULO por padrão
                 cursor.execute(
                     """INSERT INTO deteccoes (data_deteccao, dispositivo_id, predicao, tipo_ataque_id, relatorio_api,
-                                              status_resposta_id)
-                       VALUES (%s, %s, %s, %s, %s, %s)""",
-                    (dynamic_timestamp, disp_id, ataque_id, ataque_id, relatorio, status_resp_id)
+                                              status_resposta_id, incidente_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, NULL)""",
+                    (data_det, disp_id, ataque_id, ataque_id, relatorio, status_resp_id)
                 )
+                nova_deteccao_id = cursor.lastrowid
+
+                # 2. Decide se gera um incidente para esta detecção (75% de chance)
+                if random.random() < 0.75:
+                    incidentes_criados += 1
+
+                    # 3. Cria o incidente analisado correspondente
+                    risco_id = random.choice(riscos_ponderados)
+                    titulo = f"Análise do Incidente para Detecção #{nova_deteccao_id}"
+                    status_id = random.choice(list(ids['status_inc_ids'].values()))
+
+                    cursor.execute(
+                        """INSERT INTO incidentes_analisados (titulo, status_id, dispositivo_id, nivel_risco_id,
+                                                              data_deteccao, resumo_tecnico)
+                           VALUES (%s, %s, %s, %s, %s, %s)""",
+                        (titulo, status_id, disp_id, risco_id, data_det,
+                         "Evento gerado e analisado automaticamente para teste.")
+                    )
+                    novo_incidente_id = cursor.lastrowid
+
+                    # 4. ATUALIZA a detecção original com o ID do novo incidente
+                    cursor.execute(
+                        "UPDATE deteccoes SET incidente_id = %s WHERE id = %s",
+                        (novo_incidente_id, nova_deteccao_id)
+                    )
+
             print(f"  - {total_deteccoes} detecções aleatórias inseridas.")
+            print(f"  - {incidentes_criados} incidentes analisados foram criados e vinculados.")
             conn.commit()
 
-            print("\n🎉 Dados de exemplo inseridos com sucesso em maior volume!")
+            # --- FIM DA LÓGICA CORRIGIDA ---
+
+            print("\n🎉 Dados de exemplo inseridos com sucesso e com vínculos corretos!")
 
     except Exception as e:
         print(f"❌ ERRO durante a execução: {e}")

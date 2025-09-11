@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from pydantic import BaseModel, EmailStr
-from typing import Optional
 from datetime import datetime
+from typing import List, Optional
 
 # --- Schemas de Token ---
 class Token(BaseModel):
@@ -28,14 +28,31 @@ class UserInDB(UserBase):
     class Config:
         from_attributes = True  # ATUALIZADO de orm_mode
 
-# --- Schemas de Dispositivo ---
+
+#####################################################
+#####################################################
+# /schemas.py
+from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import List, Optional
+
+
+# --- Schemas para Gestão de Dispositivos ---
+
 class DispositivoBase(BaseModel):
     nome: str
     host: str
     localizacao: Optional[str] = None
 
+
 class DispositivoCreate(DispositivoBase):
     pass
+
+
+class DispositivoUpdate(BaseModel):
+    nome: Optional[str] = None
+    localizacao: Optional[str] = None
+
 
 class Dispositivo(DispositivoBase):
     id: int
@@ -43,7 +60,43 @@ class Dispositivo(DispositivoBase):
     data_cadastro: datetime
 
     class Config:
-        from_attributes = True # ATUALIZADO de orm_mode
+        from_attributes = True
+
+
+# --- Schemas para Telas de Histórico e Detalhes ---
+
+class FilterItem(BaseModel):
+    id: int
+    nome: str
+
+    class Config:
+        from_attributes = True
+
+
+class DetectionHistoryItem(BaseModel):
+    id: int
+    data_deteccao: datetime
+    tipo_ataque: str
+    nome_dispositivo: str
+    status_resposta: str
+
+    class Config:
+        from_attributes = True
+
+
+class IncidentDetail(DetectionHistoryItem):
+    dispositivo_id: int
+    resumo_tecnico: Optional[str] = "N/A"
+    explicacao_llm: Optional[str] = "Análise detalhada não disponível."
+    acoes_recomendadas: Optional[List[str]] = []
+    nivel_risco: Optional[str] = "Desconhecido"
+
+    class Config:
+        from_attributes = True
+#####################################################
+#####################################################
+
+
 
 
 class KpisSummary(BaseModel):
