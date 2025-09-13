@@ -8,6 +8,8 @@ import security
 from services import email_service
 from database import get_cursor
 
+from schemas import UserSummary
+
 router = APIRouter(
     prefix="/usuarios",
     tags=["Usuários"]
@@ -92,3 +94,83 @@ def verify_user_email(
     cursor.connection.commit()
 
     return {"message": "E-mail verificado com sucesso! Você já pode fazer login."}
+
+
+@router.get("/me", response_model=UserSummary)
+def read_users_me(current_user: dict = Depends(security.get_current_user)):
+    """Retorna os dados do usuário atualmente autenticado."""
+    # O `get_current_user` já retorna um dicionário com os dados do usuário do banco
+    # Apenas retornamos esse dicionário, e o FastAPI/Pydantic cuidará da validação
+    return current_user
+
+
+@router.post("/request-password-reset", status_code=status.HTTP_200_OK)
+def request_password_reset(
+        request_data: schemas.PasswordResetRequest,
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+):
+    """
+    (Usuário) Solicita um link para resetar a senha.
+    """
+    cursor.execute("SELECT id, nome, email FROM usuarios WHERE email = %s AND ativo = TRUE", (request_data.email,))
+    user = cursor.fetchone()
+
+    # Mesmo que o usuário não exista, retornamos sucesso para evitar enumeração de e-mails
+    if user:
+        token = security.generate_secure_code(length=32)
+        hashed_token = security.get_password_hash(token)
+        expiration = datetime.utcnow() + timedelta(hours=1)  # Token válido por 1 hora
+
+        cursor.execute(
+            "UPDATE usuarios SET reset_senha_token=%s, reset_senha_expiracao=%s WHERE id=%s",
+            (hashed_token, expiration, user['id'])
+        )
+
+        # Envie um e-mail com o link para resetar a senha
+        reset_link = f"http://sua-app-web.com/reset-password?token={token}"  # Adapte este link
+        subject = "Redefinição de Senha - Plataforma qCyber"
+        email_body = f"Olá {user['nome']},<br><br>Clique no link a seguir para redefinir sua senha: <a href='{reset_link}'>{reset_link}</a>"
+        email_service.send_email_html(user['email'], subject, email_body, cursor)
+
+        cursor.connection.commit()
+
+    return {"message": "Se o e-mail estiver cadastrado, um link de recuperação será enviado."}
+
+
+@router.post("/perform-password-reset", status_code=status.HTTP_200_OK)
+def perform_password_reset(
+        reset_data: schemas.PasswordResetPerform,
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+):
+    """
+    (Usuário) Efetiva a troca de senha usando o token.
+    """
+    if not reset_data.token or not reset_data.nova_senha:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token e nova senha são obrigatórios.")
+
+    # Busca todos os usuários para verificar o hash do token (não é o ideal para performance, mas funciona)
+    cursor.execute(
+        "SELECT id, reset_senha_token, reset_senha_expiracao FROM usuarios WHERE reset_senha_token IS NOT NULL")
+    users_with_token = cursor.fetchall()
+
+    target_user = None
+    for user in users_with_token:
+        if security.verify_password(reset_data.token, user['reset_senha_token']):
+            target_user = user
+            break
+
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido.")
+
+    if datetime.utcnow() > target_user['reset_senha_expiracao']:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado.")
+
+    # Tudo certo, atualiza a senha
+    new_hashed_password = security.get_password_hash(reset_data.nova_senha)
+    cursor.execute(
+        "UPDATE usuarios SET senha_hash = %s, reset_senha_token = NULL, reset_senha_expiracao = NULL WHERE id = %s",
+        (new_hashed_password, target_user['id'])
+    )
+    cursor.connection.commit()
+
+    return {"message": "Senha atualizada com sucesso."}

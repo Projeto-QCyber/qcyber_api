@@ -187,13 +187,21 @@ def recreate_database():
                                tem_permissao_sistema        BOOLEAN   DEFAULT TRUE,
                                email_verificado             BOOLEAN   DEFAULT FALSE,
                                dois_fatores_ativo           BOOLEAN   DEFAULT FALSE,
+
+                               -- Campos para verificação de conta e 2FA
                                codigo_verificacao           VARCHAR(255) NULL,
                                codigo_verificacao_expiracao TIMESTAMP NULL,
                                tentativas_verificacao       INT       DEFAULT 0,
+
+                               -- NOVOS CAMPOS PARA RESET DE SENHA
+                               reset_senha_token            VARCHAR(255) NULL,
+                               reset_senha_expiracao        TIMESTAMP NULL,
+
                                data_criacao                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                INDEX                        idx_email (email)
                            ) ENGINE=InnoDB
                            """)
+
             print("✅ Tabela 'usuarios' criada.")
 
             cursor.execute("""

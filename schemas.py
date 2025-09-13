@@ -151,3 +151,42 @@ class DashboardSummary(BaseModel):
     deteccoes_por_hora: list[DeteccoesPorHora]
     dispositivos_atacados: list[DispositivosAtacados]
     incidentes_por_risco: list[IncidentesPorRisco]
+
+
+# =================================
+#       ADMINISTRAÇÃO
+# =================================
+
+class UserSummary(BaseModel):
+    """Schema para a lista de usuários na tela de admin."""
+    id: int
+    nome: str
+    email: str
+    is_admin: bool
+    tem_permissao_sistema: bool
+    ativo: bool
+
+    class Config:
+        from_attributes = True
+
+class UserPermissionUpdate(BaseModel):
+    """Schema para atualizar as permissões de um usuário."""
+    is_admin: bool
+    tem_permissao_sistema: bool
+
+class SettingsUpdate(BaseModel):
+    """Schema para receber as novas configurações de SMTP."""
+    SMTP_SERVER: str
+    SMTP_PORT: str
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    SMTP_SENDER_NAME: str
+
+class PasswordResetRequest(BaseModel):
+    """Schema para solicitar o reset de senha."""
+    email: EmailStr
+
+class PasswordResetPerform(BaseModel):
+    """Schema para efetivar a troca de senha com o token."""
+    token: str
+    nova_senha: str

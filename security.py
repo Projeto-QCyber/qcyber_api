@@ -82,3 +82,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), cursor: pymysql.cursor
         raise credentials_exception
     return user
 
+
+def get_current_admin_user(current_user: dict = Depends(get_current_user)):
+    """
+    Dependência que verifica se o usuário autenticado é um administrador.
+    Reutiliza get_current_user e adiciona uma camada de verificação.
+    """
+    # A função get_current_user já nos deu o usuário do banco.
+    # Agora, apenas verificamos o campo 'is_admin'.
+    if not current_user.get("is_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado: privilégios de administrador necessários."
+        )
+    return current_user

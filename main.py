@@ -8,7 +8,8 @@ from routers import (login_router,
                      usuarios_router,
                      dashboard_router,
                      history_router,
-                     report_router,)
+                     report_router,
+                     admin_router)
 
 # Cria a instância principal da aplicação FastAPI
 app = FastAPI(
@@ -34,6 +35,7 @@ app.include_router(dashboard_router.router, tags=["Dashboard"])
 
 app.include_router(history_router.router, tags=["Histórico"])
 app.include_router(report_router.router, tags=["Relatórios"])
+app.include_router(admin_router.router,tags=["Administração"])
 
 
 @app.get("/", tags=["Root"])
