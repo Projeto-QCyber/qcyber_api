@@ -15,10 +15,10 @@ from dotenv import load_dotenv
 # pois não são mais necessárias neste script.
 
 def recreate_database():
-    """Recria o banco de dados qcyberDB completamente."""
+    """Recria o banco de dados qcyber_db completamente."""
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DB', 'qcyberDB')
+    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
 
     print("=" * 60)
     print("CRIAÇÃO DA ESTRUTURA DO BANCO DE DADOS - PROJETO QCYBER")
@@ -293,7 +293,7 @@ def verify_database():
     print("\nPASSO 5: Verificando a estrutura do banco de dados...")
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DB', 'qcyberDB')
+    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
 
     try:
         conn = pymysql.connect(
@@ -322,7 +322,7 @@ def verify_database():
 # A função create_default_users() foi completamente removida.
 
 if __name__ == '__main__':
-    print("ATENÇÃO: Este script irá apagar e recriar a ESTRUTURA do banco de dados 'qcyberDB'!")
+    print("ATENÇÃO: Este script irá apagar e recriar a ESTRUTURA do banco de dados 'qcyber_db'!")
     print("         NENHUM usuário será criado.")
     resposta = input("Você tem certeza que deseja continuar? (s/N): ")
 

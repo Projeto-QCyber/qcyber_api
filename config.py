@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     MYSQL_HOST: str
     MYSQL_USER: str
     MYSQL_PASSWORD: str
-    MYSQL_DB: str
+    MYSQL_DATABASE: str
 
     # Configurações de Segurança (JWT)
     SECRET_KEY: str

@@ -43,7 +43,7 @@ python-jose[cryptography]
 MYSQL_HOST=localhost
 MYSQL_USER=root
 MYSQL_PASSWORD=root
-MYSQL_DB=qcyberDB
+MYSQL_DATABASE=qcyber_db
 
 # --- CONFIGURAÇÕES DE SEGURANÇA (JWT) ---
 # Gere uma chave secreta forte. Você pode usar: openssl rand -hex 32
@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     MYSQL_HOST: str
     MYSQL_USER: str
     MYSQL_PASSWORD: str
-    MYSQL_DB: str
+    MYSQL_DATABASE: str
 
     # Configurações de Segurança (JWT)
     SECRET_KEY: str
@@ -211,7 +211,7 @@ def get_db_connection():
             host=settings.MYSQL_HOST,
             user=settings.MYSQL_USER,
             password=settings.MYSQL_PASSWORD,
-            database=settings.MYSQL_DB,
+            database=settings.MYSQL_DATABASE,
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor
         )

@@ -13,7 +13,6 @@ Para iniciar o servidor em modo de desenvolvimento (com recarregamento automáti
 
 ```bash
 uvicorn main:app --reload
-
 ```
 
 ## Rotas
