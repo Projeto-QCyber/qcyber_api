@@ -1,57 +1,102 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 import pymysql
 
 import schemas
 import security
+from services import email_service
 from config import settings
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/login"
+    prefix="/login",
+    tags=["Autenticação"]
 )
 
-@router.post("/token", response_model=schemas.Token)
+
+@router.post("/token")
 def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+        response: Response,
+        form_data: OAuth2PasswordRequestForm = Depends(),
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
 ):
     """
-    Endpoint de login. Recebe email (no campo 'username') e senha.
-    Verifica as credenciais e retorna um token JWT.
+    Endpoint de login. Se o 2FA estiver ativo, envia código por e-mail e retorna token temporário.
     """
-    try:
-        cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
-        user = cursor.fetchone()
+    cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
+    user = cursor.fetchone()
 
-        # DEBUG: Adicione este print para ver o que está vindo do banco
-        # print(f"--- DADOS DO USUÁRIO DO BANCO --- \n{user}\n---------------------------------")
+    if not user or not security.verify_password(form_data.password, user["senha_hash"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou senha incorretos")
 
-        if not user or not security.verify_password(form_data.password, user["senha_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email ou senha incorretos",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    if not user.get('email_verificado', False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="E-mail não verificado. Por favor, ative sua conta.")
 
-        if not user.get('ativo', True):
-             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Usuário inativo.",
-            )
+    if not user.get('ativo', True):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário inativo.")
 
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = security.create_access_token(
-            data={"sub": user["email"]}, expires_delta=access_token_expires
+    if user.get('dois_fatores_ativo', False):
+        # Gera e envia código 2FA
+        code = security.generate_secure_code()
+        hashed_code = security.get_password_hash(code)
+        expiration = datetime.utcnow() + timedelta(minutes=5)
+
+        sql = "UPDATE usuarios SET codigo_verificacao=%s, codigo_verificacao_expiracao=%s, tentativas_verificacao=0 WHERE id=%s"
+        cursor.execute(sql, (hashed_code, expiration, user['id']))
+
+        email_service.send_verification_email(user['email'], code, "Seu código de login qCyber", cursor)
+        cursor.connection.commit()
+
+        # Retorna desafio com token temporário
+        temp_token = security.create_access_token(
+            data={"sub": user["email"], "scope": "2fa_login"},
+            expires_delta=timedelta(minutes=5)
         )
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"message": "Autenticação de dois fatores necessária.", "temp_token": temp_token}
 
-        return {"access_token": access_token, "token_type": "bearer"}
+    # Login normal
+    access_token = security.create_access_token(data={"sub": user["email"]})
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    except Exception as e:
-        print(f"Erro no login: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ocorreu um erro interno durante o login."
-        )
+
+@router.post("/token/2fa", response_model=schemas.Token)
+def verify_2fa_login(
+        verification_data: schemas.TwoFactorVerify,
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+):
+    """Verifica o código 2FA do e-mail e retorna o token de acesso final."""
+    token_data = security.decode_access_token(
+        token=verification_data.temp_token,
+        credentials_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                            detail="Token temporário inválido")
+    )
+
+    cursor.execute("SELECT * FROM usuarios WHERE email = %s", (token_data["sub"],))
+    user = cursor.fetchone()
+
+    # Lógica de tentativas
+    if user['tentativas_verificacao'] >= 3:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Muitas tentativas inválidas. Por favor, tente fazer o login novamente.")
+
+    if not user or not user['codigo_verificacao'] or not security.verify_password(verification_data.code,
+                                                                                  user['codigo_verificacao']):
+        cursor.execute("UPDATE usuarios SET tentativas_verificacao = tentativas_verificacao + 1 WHERE id=%s",
+                       (user['id'],))
+        cursor.connection.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código 2FA inválido.")
+
+    if datetime.utcnow() > user['codigo_verificacao_expiracao']:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código 2FA expirado.")
+
+    # Sucesso: Limpa os campos e gera o token final
+    sql = "UPDATE usuarios SET codigo_verificacao=NULL, codigo_verificacao_expiracao=NULL, tentativas_verificacao=0 WHERE id=%s"
+    cursor.execute(sql, (user['id'],))
+    cursor.connection.commit()
+
+    access_token = security.create_access_token(data={"sub": user["email"]})
+    return {"access_token": access_token, "token_type": "bearer"}

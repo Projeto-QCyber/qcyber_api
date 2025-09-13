@@ -209,7 +209,7 @@ def get_acoes_details(
         return []
 
 
-@router.get("/details/incidentes", response_model=List[schemas.IncidenteDetail])
+@router.get("/details/incidentes", response_model=List[schemas.IncidentDetail])
 def get_incidentes_details(
         cursor: pymysql.cursors.DictCursor = Depends(get_cursor),
         start_date: Optional[datetime] = Query(None),
