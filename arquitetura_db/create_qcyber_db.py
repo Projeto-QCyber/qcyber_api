@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Script para recriar o banco de dados do projeto qCyber. (VERSÃO COM NORMALIZAÇÃO)
-
-Este script implementa a normalização para campos ENUM e tipos de ataque,
-criando tabelas de lookup (enum_*) para maior flexibilidade e performance.
-Este script foca APENAS na criação da estrutura (schemas e tabelas).
+Script final e completo para recriar o banco de dados do projeto qCyber.
+Esta versão une a estrutura original com as novas funcionalidades de autenticação.
 """
 import os
 import pymysql
 from dotenv import load_dotenv
 
-
-# A função de hash e a importação do passlib/hashlib foram removidas,
-# pois não são mais necessárias neste script.
 
 def recreate_database():
     """Recria o banco de dados qcyber_db completamente."""
@@ -48,7 +42,7 @@ def recreate_database():
 
             cursor.execute(f"USE {db_name}")
 
-            print("\nPASSO 3: Criando e populando tabelas de Lookup (ENUMs)...")
+            print("\nPASSO 3: Criando e populando tabelas de Lookup (ENUMs) e Configurações...")
 
             # Tabela para Tipos de Ataque
             cursor.execute("""
@@ -141,7 +135,7 @@ def recreate_database():
                                status_dispositivo)
             print("✅ Tabela 'enum_status_dispositivo' criada e populada.")
 
-            # NOVA Tabela para Ações Executadas
+            # Tabela para Ações Executadas
             cursor.execute("""
                            CREATE TABLE enum_acao_executada
                            (
@@ -159,6 +153,24 @@ def recreate_database():
             cursor.executemany("INSERT INTO enum_acao_executada (nome, descricao) VALUES (%s, %s)", acoes_executadas)
             print("✅ Tabela 'enum_acao_executada' criada e populada.")
 
+            # Tabela de Configurações do Sistema
+            cursor.execute("""
+                           CREATE TABLE configuracoes
+                           (
+                               chave VARCHAR(50) PRIMARY KEY,
+                               valor VARCHAR(255) NOT NULL
+                           ) ENGINE=InnoDB;
+                           """)
+            configuracoes_padrao = [
+                ('SMTP_SERVER', 'smtp.example.com'),
+                ('SMTP_PORT', '587'),
+                ('SMTP_USER', 'user@example.com'),
+                ('SMTP_PASSWORD', 'password'),
+                ('SMTP_SENDER_NAME', 'qCyber Platform')
+            ]
+            cursor.executemany("INSERT INTO configuracoes (chave, valor) VALUES (%s, %s)", configuracoes_padrao)
+            print("✅ Tabela 'configuracoes' criada e populada com valores padrão.")
+
             conn.commit()
 
             print("\nPASSO 4: Criando tabelas principais com chaves estrangeiras...")
@@ -166,19 +178,30 @@ def recreate_database():
             cursor.execute("""
                            CREATE TABLE usuarios
                            (
-                               id                    INT AUTO_INCREMENT PRIMARY KEY,
-                               nome                  VARCHAR(100) NOT NULL,
-                               email                 VARCHAR(100) NOT NULL UNIQUE,
-                               senha_hash            VARCHAR(255) NOT NULL,
-                               ativo                 BOOLEAN   DEFAULT TRUE,
-                               is_admin              BOOLEAN   DEFAULT FALSE,
-                               tem_permissao_sistema BOOLEAN   DEFAULT TRUE,
-                               email_verificado      BOOLEAN   DEFAULT FALSE,
-                               dois_fatores_ativo    BOOLEAN   DEFAULT FALSE,
-                               data_criacao          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                               INDEX                 idx_email (email)
+                               id                           INT AUTO_INCREMENT PRIMARY KEY,
+                               nome                         VARCHAR(100) NOT NULL,
+                               email                        VARCHAR(100) NOT NULL UNIQUE,
+                               senha_hash                   VARCHAR(255) NOT NULL,
+                               ativo                        BOOLEAN   DEFAULT FALSE,
+                               is_admin                     BOOLEAN   DEFAULT FALSE,
+                               tem_permissao_sistema        BOOLEAN   DEFAULT TRUE,
+                               email_verificado             BOOLEAN   DEFAULT FALSE,
+                               dois_fatores_ativo           BOOLEAN   DEFAULT FALSE,
+
+                               -- Campos para verificação de conta e 2FA
+                               codigo_verificacao           VARCHAR(255) NULL,
+                               codigo_verificacao_expiracao TIMESTAMP NULL,
+                               tentativas_verificacao       INT       DEFAULT 0,
+
+                               -- NOVOS CAMPOS PARA RESET DE SENHA
+                               reset_senha_token            VARCHAR(255) NULL,
+                               reset_senha_expiracao        TIMESTAMP NULL,
+
+                               data_criacao                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               INDEX                        idx_email (email)
                            ) ENGINE=InnoDB
                            """)
+
             print("✅ Tabela 'usuarios' criada.")
 
             cursor.execute("""
@@ -280,8 +303,6 @@ def recreate_database():
         if 'conn' in locals() and conn.open:
             conn.close()
 
-    # A chamada para criar usuários foi removida daqui.
-    # O script agora termina após a verificação.
     if not verify_database():
         return False
 
@@ -318,8 +339,6 @@ def verify_database():
         print(f"❌ ERRO na verificação: {e}")
         return False
 
-
-# A função create_default_users() foi completamente removida.
 
 if __name__ == '__main__':
     print("ATENÇÃO: Este script irá apagar e recriar a ESTRUTURA do banco de dados 'qcyber_db'!")
