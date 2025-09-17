@@ -1,6 +1,6 @@
 # Arquitetura do Banco de Dados - Projeto qCyber (Versão Final)
 
-Este documento descreve a estrutura final e normalizada do banco de dados `qcyberDB`, projetado para ser robusto, escalável e de fácil manutenção.
+Este documento descreve a estrutura final e normalizada do banco de dados `qcyber_db`, projetado para ser robusto, escalável e de fácil manutenção.
 
 ## Visão Geral e Diagrama de Relacionamento
 
