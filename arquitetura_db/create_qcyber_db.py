@@ -12,7 +12,7 @@ def recreate_database():
     """Recria o banco de dados qcyber_db completamente."""
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
+    db_name = os.getenv('MYSQL_DB', 'qcyber_db')
 
     print("=" * 60)
     print("CRIAÇÃO DA ESTRUTURA DO BANCO DE DADOS - PROJETO QCYBER")
@@ -314,7 +314,7 @@ def verify_database():
     print("\nPASSO 5: Verificando a estrutura do banco de dados...")
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
+    db_name = os.getenv('MYSQL_DB', 'qcyber_db')
 
     try:
         conn = pymysql.connect(

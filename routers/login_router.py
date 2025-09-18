@@ -11,7 +11,7 @@ from config import settings
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/login",
+    prefix="/qcyberapi/login",
     tags=["Autenticação"]
 )
 

@@ -50,7 +50,7 @@ def ensure_risk_levels(cursor):
 def seed_data():
     """Conecta ao banco e insere os dados de exemplo."""
     load_dotenv()
-    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
+    db_name = os.getenv('MYSQL_DB', 'qcyber_db')
 
     try:
         conn = pymysql.connect(
@@ -202,9 +202,9 @@ if __name__ == '__main__':
             f.write("MYSQL_HOST=localhost\n")
             f.write("MYSQL_USER=root\n")
             f.write("MYSQL_PASSWORD=root\n")
-            f.write("MYSQL_DATABASE=qcyber_db\n")
+            f.write("MYSQL_DB=qcyber_db\n")
 
-    print(f"Este script irá LIMPAR e REINSERIR dados no banco '{os.getenv('MYSQL_DATABASE', 'qcyber_db')}'")
+    print(f"Este script irá LIMPAR e REINSERIR dados no banco '{os.getenv('MYSQL_DB', 'qcyber_db')}'")
     resposta = input("ATENÇÃO: DADOS ANTERIORES SERÃO APAGADOS. Deseja continuar? (s/N): ")
     if resposta.lower() in ['s', 'sim']:
         seed_data()

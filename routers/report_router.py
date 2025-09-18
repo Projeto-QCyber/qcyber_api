@@ -14,7 +14,7 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.enums import TA_JUSTIFY
 
 router = APIRouter(
-    prefix="/report",
+    prefix="/qcyberapi/report",
     tags=["Reports"],
     dependencies=[Depends(security.oauth2_scheme)]
 )

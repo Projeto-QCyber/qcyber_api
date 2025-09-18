@@ -8,7 +8,7 @@ import schemas
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/dashboard",
+    prefix="/qcyberapi/dashboard",
     tags=["Dashboard"]
 )
 
@@ -33,14 +33,14 @@ def get_dashboard_summary(
         # 1. Primeiro, buscamos os KPIs que dependem do filtro de data.
         #    A lógica de 'acoes_executadas' também foi corrigida para ser consistente.
         kpis_com_data_query = """
-                              SELECT (SELECT COUNT(*) FROM deteccoes WHERE data_deteccao BETWEEN %s AND %s)          AS total_deteccoes, \
-                                     (SELECT COUNT(*) \
-                                      FROM deteccoes \
-                                      WHERE acao_executada_id IS NOT NULL \
-                                        AND data_acao_executada BETWEEN %s AND %s)                                   AS acoes_executadas, \
-                                     (SELECT COUNT(*) \
-                                      FROM incidentes_analisados \
-                                      WHERE data_criacao BETWEEN %s AND %s)                                          AS incidentes_criados; \
+                              SELECT (SELECT COUNT(*) FROM deteccoes WHERE data_deteccao BETWEEN %s AND %s)          AS total_deteccoes, 
+                                     (SELECT COUNT(*) 
+                                      FROM deteccoes 
+                                      WHERE acao_executada_id IS NOT NULL 
+                                        AND data_acao_executada BETWEEN %s AND %s)                                   AS acoes_executadas, 
+                                     (SELECT COUNT(*) 
+                                      FROM incidentes_analisados 
+                                      WHERE data_criacao BETWEEN %s AND %s)                                          AS incidentes_criados; 
                               """
         # Passamos apenas os 4 parâmetros necessários para esta query.
         cursor.execute(kpis_com_data_query, (start_date, end_date, start_date, end_date, start_date, end_date))
@@ -61,11 +61,11 @@ def get_dashboard_summary(
         # Query para o gráfico de ataques por tipo
         ataques_query = """
                         SELECT eta.nome AS nome_ataque, eta.descricao AS descricao, COUNT(d.id) AS total
-                        FROM deteccoes d \
+                        FROM deteccoes d 
                                  JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
                         WHERE d.data_deteccao BETWEEN %s AND %s
-                        GROUP BY eta.nome, eta.descricao \
-                        ORDER BY total DESC LIMIT 5; \
+                        GROUP BY eta.nome, eta.descricao 
+                        ORDER BY total DESC LIMIT 5; 
                         """
         cursor.execute(ataques_query, (start_date, end_date))
         ataques_result = cursor.fetchall()
@@ -73,17 +73,17 @@ def get_dashboard_summary(
         # ... (O resto do seu código, de "deteccoes_query" em diante, continua igual)
         # Query para a tabela de últimas detecções
         deteccoes_query = """
-                          SELECT d.id, \
-                                 d.data_deteccao, \
-                                 disp.nome AS nome_dispositivo, \
-                                 eta.nome  AS tipo_ataque, \
+                          SELECT d.id, 
+                                 d.data_deteccao, 
+                                 disp.nome AS nome_dispositivo, 
+                                 eta.nome  AS tipo_ataque, 
                                  esr.nome  AS status_resposta
                           FROM deteccoes d
                                    JOIN dispositivos disp ON d.dispositivo_id = disp.id
                                    JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
                                    JOIN enum_status_resposta esr ON d.status_resposta_id = esr.id
                           WHERE d.data_deteccao BETWEEN %s AND %s
-                          ORDER BY d.data_deteccao DESC LIMIT 10; \
+                          ORDER BY d.data_deteccao DESC LIMIT 10; 
                           """
         cursor.execute(deteccoes_query, (start_date, end_date))
         deteccoes_result = cursor.fetchall()
@@ -101,11 +101,11 @@ def get_dashboard_summary(
         # Query para o gráfico de barras (dispositivos mais atacados)
         dispositivos_query = """
                              SELECT disp.nome AS nome_dispositivo, COUNT(d.id) AS total
-                             FROM deteccoes d \
+                             FROM deteccoes d 
                                       JOIN dispositivos disp ON d.dispositivo_id = disp.id
                              WHERE d.data_deteccao BETWEEN %s AND %s
-                             GROUP BY nome_dispositivo \
-                             ORDER BY total DESC LIMIT 5; \
+                             GROUP BY nome_dispositivo 
+                             ORDER BY total DESC LIMIT 5; 
                              """
         cursor.execute(dispositivos_query, (start_date, end_date))
         dispositivos_atacados_result = cursor.fetchall()  # Renomeado para evitar conflito
@@ -113,11 +113,11 @@ def get_dashboard_summary(
         # Query para o gráfico de colunas (incidentes por risco)
         risco_query = """
                       SELECT enr.nome as nivel_risco, COUNT(ia.id) as total
-                      FROM incidentes_analisados ia \
+                      FROM incidentes_analisados ia 
                                JOIN enum_nivel_risco enr ON ia.nivel_risco_id = enr.id
                       WHERE ia.data_criacao BETWEEN %s AND %s
-                      GROUP BY nivel_risco \
-                      ORDER BY enr.id; \
+                      GROUP BY nivel_risco 
+                      ORDER BY enr.id; 
                       """
         cursor.execute(risco_query, (start_date, end_date))
         risco_result = cursor.fetchall()
@@ -163,17 +163,17 @@ def get_deteccoes_details(
 
     try:
         deteccoes_query = """
-                          SELECT d.id, \
-                                 d.data_deteccao, \
-                                 disp.nome AS nome_dispositivo, \
-                                 eta.nome  AS tipo_ataque, \
+                          SELECT d.id, 
+                                 d.data_deteccao, 
+                                 disp.nome AS nome_dispositivo, 
+                                 eta.nome  AS tipo_ataque, 
                                  esr.nome  AS status_resposta
                           FROM deteccoes d
                                    JOIN dispositivos disp ON d.dispositivo_id = disp.id
                                    JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
                                    JOIN enum_status_resposta esr ON d.status_resposta_id = esr.id
                           WHERE d.data_deteccao BETWEEN %s AND %s
-                          ORDER BY d.data_deteccao DESC LIMIT 20; \
+                          ORDER BY d.data_deteccao DESC LIMIT 20; 
                           """
         cursor.execute(deteccoes_query, (start_date, end_date))
         return cursor.fetchall()
@@ -198,9 +198,9 @@ def get_acoes_details(
                 SELECT d.data_acao_executada, d.acao_parametro, ea.nome as nome_acao
                 FROM deteccoes d
                          JOIN enum_acao_executada ea ON d.acao_executada_id = ea.id
-                WHERE d.acao_executada_id IS NOT NULL \
+                WHERE d.acao_executada_id IS NOT NULL 
                   AND d.data_acao_executada BETWEEN %s AND %s
-                ORDER BY d.data_acao_executada DESC LIMIT 20; \
+                ORDER BY d.data_acao_executada DESC LIMIT 20; 
                 """
         cursor.execute(query, (start_date, end_date))
         return cursor.fetchall()
@@ -225,7 +225,7 @@ def get_incidentes_details(
                 FROM incidentes_analisados ia
                          JOIN enum_nivel_risco enr ON ia.nivel_risco_id = enr.id
                 WHERE ia.data_criacao BETWEEN %s AND %s
-                ORDER BY ia.data_criacao DESC LIMIT 20; \
+                ORDER BY ia.data_criacao DESC LIMIT 20; 
                 """
         cursor.execute(query, (start_date, end_date))
         return cursor.fetchall()

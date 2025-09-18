@@ -11,7 +11,7 @@ from database import get_cursor
 from schemas import UserSummary
 
 router = APIRouter(
-    prefix="/usuarios",
+    prefix="/qcyberapi/usuarios",
     tags=["Usuários"]
 )
 

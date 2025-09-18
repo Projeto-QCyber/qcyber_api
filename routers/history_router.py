@@ -7,7 +7,7 @@ import schemas, security
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/history",
+    prefix="/qcyberapi/history",
     tags=["History"],
     dependencies=[Depends(security.oauth2_scheme)]
 )
