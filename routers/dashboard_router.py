@@ -173,7 +173,7 @@ def get_deteccoes_details(
                                    JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
                                    JOIN enum_status_resposta esr ON d.status_resposta_id = esr.id
                           WHERE d.data_deteccao BETWEEN %s AND %s
-                          ORDER BY d.data_deteccao DESC LIMIT 20; 
+                          ORDER BY d.data_deteccao DESC; 
                           """
         cursor.execute(deteccoes_query, (start_date, end_date))
         return cursor.fetchall()
@@ -200,7 +200,7 @@ def get_acoes_details(
                          JOIN enum_acao_executada ea ON d.acao_executada_id = ea.id
                 WHERE d.acao_executada_id IS NOT NULL 
                   AND d.data_acao_executada BETWEEN %s AND %s
-                ORDER BY d.data_acao_executada DESC LIMIT 20; 
+                ORDER BY d.data_acao_executada DESC; 
                 """
         cursor.execute(query, (start_date, end_date))
         return cursor.fetchall()
@@ -209,7 +209,8 @@ def get_acoes_details(
         return []
 
 
-@router.get("/details/incidentes", response_model=List[schemas.IncidentDetail])
+# @router.get("/details/incidentes", response_model=List[schemas.IncidentDetail])
+@router.get("/details/incidentes", response_model=List[schemas.IncidenteDetailPopUp])
 def get_incidentes_details(
         cursor: pymysql.cursors.DictCursor = Depends(get_cursor),
         start_date: Optional[datetime] = Query(None),
@@ -225,7 +226,7 @@ def get_incidentes_details(
                 FROM incidentes_analisados ia
                          JOIN enum_nivel_risco enr ON ia.nivel_risco_id = enr.id
                 WHERE ia.data_criacao BETWEEN %s AND %s
-                ORDER BY ia.data_criacao DESC LIMIT 20; 
+                ORDER BY ia.data_criacao DESC; 
                 """
         cursor.execute(query, (start_date, end_date))
         return cursor.fetchall()

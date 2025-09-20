@@ -1,8 +1,8 @@
 # schemas.py
 # -*- coding: utf-8 -*-
 from pydantic import BaseModel, EmailStr
-from typing import Optional
 from datetime import datetime
+from typing import List, Optional
 
 # =================================
 #       AUTENTICAÇÃO E USUÁRIOS
