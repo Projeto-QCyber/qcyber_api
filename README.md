@@ -30,6 +30,18 @@ Para iniciar o servidor em modo de desenvolvimento (com recarregamento automáti
 uvicorn main:app --reload
 ```
 
+
+
+## IMPORTANTE
+
+configuarar a variavel de ambinete apontando para o link do servidor de produção;
+Ela esta na config.py e na .env 
+
+```
+FRONTEND_BASE_URL
+```
+
+
 ## Rotas
 
 Autenticação

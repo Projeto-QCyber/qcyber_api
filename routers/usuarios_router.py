@@ -10,6 +10,8 @@ from database import get_cursor
 
 from schemas import UserSummary
 
+from config import settings
+
 router = APIRouter(
     prefix="/qcyberapi/usuarios",
     tags=["Usuários"]
@@ -127,7 +129,9 @@ def request_password_reset(
         )
 
         # Envie um e-mail com o link para resetar a senha
-        reset_link = f"http://sua-app-web.com/reset-password?token={token}"  # Adapte este link
+        # reset_link = f"http://sua-app-web.com/reset-password?token={token}"  # Adapte este link
+        reset_link = f"{settings.FRONTEND_BASE_URL}/#/reset-password?token={token}"
+
         subject = "Redefinição de Senha - Plataforma qCyber"
         email_body = f"Olá {user['nome']},<br><br>Clique no link a seguir para redefinir sua senha: <a href='{reset_link}'>{reset_link}</a>"
         email_service.send_email_html(user['email'], subject, email_body, cursor)

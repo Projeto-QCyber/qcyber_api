@@ -6,6 +6,8 @@ import pymysql
 
 import schemas
 import security
+
+from services import email_service
 from database import get_cursor
 
 router = APIRouter(
@@ -117,7 +119,7 @@ def admin_reset_user_password(
     Recomendamos que você faça login e altere esta senha o mais rápido possível.
     """
     # (A função de enviar e-mail precisa ser adaptada para aceitar um corpo HTML)
-    #email_service.send_email_html(user['email'], subject, email_body, cursor) # Supõe que criaremos essa função
+    email_service.send_email_html(user['email'], subject, email_body, cursor) # Supõe que criaremos essa função
 
     cursor.connection.commit()
     return {"message": "Senha temporária enviada para o e-mail do usuário."}

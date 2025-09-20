@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    # --- ADICIONE A LINHA ABAIXO ---
+    # URL base do frontend para montar links em e-mails
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
     class Config:
         env_file = ".env"  # Especifica o arquivo .env a ser lido
         case_sensitive = True

@@ -6,15 +6,16 @@ import pymysql
 from database import get_cursor
 
 
-def send_verification_email(to_email: str, code: str, subject: str, cursor: pymysql.cursors.DictCursor):
+def _send_email(to_email: str, subject: str, html_content: str, cursor: pymysql.cursors.DictCursor) -> bool:
     """
-    Busca as configurações de SMTP do banco e envia um e-mail.
-    Esta função será usada tanto para verificação de conta quanto para 2FA.
+    Função interna e genérica para enviar e-mails.
+    Busca as configurações de SMTP do banco e envia a mensagem com o conteúdo HTML fornecido.
     """
     try:
         # Busca as configurações de SMTP no banco de dados
         cursor.execute("SELECT chave, valor FROM configuracoes WHERE chave LIKE 'SMTP_%'")
         configs_list = cursor.fetchall()
+
         # Converte a lista de dicionários para um único dicionário
         smtp_configs = {item['chave']: item['valor'] for item in configs_list}
 
@@ -34,19 +35,8 @@ def send_verification_email(to_email: str, code: str, subject: str, cursor: pymy
         message["From"] = f"{sender_name} <{smtp_user}>"
         message["To"] = to_email
 
-        html = f"""
-        <html>
-        <body>
-            <p>Olá,</p>
-            <p>Seu código de verificação é:</p>
-            <h2 style="font-size: 24px; letter-spacing: 2px; text-align: center;">{code}</h2>
-            <p>Este código irá expirar em 5 minutos.</p>
-            <p>Se você não solicitou este código, por favor, ignore este e-mail.</p>
-            <p>Atenciosamente,<br>Equipe qCyber</p>
-        </body>
-        </html>
-        """
-        message.attach(MIMEText(html, "html"))
+        # Anexa o conteúdo HTML passado como argumento
+        message.attach(MIMEText(html_content, "html"))
 
         # Envia o e-mail
         with smtplib.SMTP(smtp_server, smtp_port) as server:
@@ -54,9 +44,37 @@ def send_verification_email(to_email: str, code: str, subject: str, cursor: pymy
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_user, to_email, message.as_string())
 
-        print(f"✅ E-mail de verificação enviado para {to_email}")
+        print(f"✅ E-mail enviado com sucesso para {to_email} com o assunto '{subject}'")
         return True
 
     except Exception as e:
         print(f"❌ ERRO ao enviar e-mail: {e}")
         return False
+
+
+def send_verification_email(to_email: str, code: str, subject: str, cursor: pymysql.cursors.DictCursor):
+    """
+    Prepara e envia um e-mail de VERIFICAÇÃO DE CÓDIGO.
+    Esta função monta o HTML específico para o código e chama a função de envio principal.
+    """
+    html = f"""
+    <html>
+    <body>
+        <p>Olá,</p>
+        <p>Seu código de verificação é:</p>
+        <h2 style="font-size: 24px; letter-spacing: 2px; text-align: center;">{code}</h2>
+        <p>Este código irá expirar em 5 minutos.</p>
+        <p>Se você não solicitou este código, por favor, ignore este e-mail.</p>
+        <p>Atenciosamente,<br>Equipe qCyber</p>
+    </body>
+    </html>
+    """
+    return _send_email(to_email, subject, html, cursor)
+
+
+def send_email_html(to_email: str, subject: str, html_content: str, cursor: pymysql.cursors.DictCursor):
+    """
+    Envia um e-mail com um CORPO HTML totalmente personalizado.
+    Esta é a função que você chamará da sua rota de admin.
+    """
+    return _send_email(to_email, subject, html_content, cursor)
