@@ -11,8 +11,11 @@ from datetime import datetime
 
 # --- CONFIGURAÇÕES ---
 # Endereço da sua nova API de análise (rodando no desktop)
-API_ANALISE_URL = "http://192.168.1.68:5000/analisar"
-DATA_PATH = "data/dados_de_teste.csv"
+# API_ANALISE_URL = "http://192.168.1.68:5000/analisar"
+API_ANALISE_URL = "http://127.0.0.1:5000/analisar"
+DATA_PATH = "../data/dados_de_teste.csv"
+tempoi=20 #segundos
+tempof=50 #sengundos
 
 
 # --- FUNÇÕES DE BANCO DE DADOS ---
@@ -94,7 +97,7 @@ def run_simulator():
         except Exception as e:
             print(f"❌ ERRO ao enviar a requisição para a linha {index}: {e}")
 
-        time.sleep(random.uniform(2, 5))  # Espera entre 2 e 5 segundos
+        time.sleep(random.uniform(tempoi, tempof))  # Espera entre 2 e 5 segundos
 
     print("\n🏁 Simulação concluída.")
 

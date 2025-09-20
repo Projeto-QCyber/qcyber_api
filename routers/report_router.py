@@ -16,6 +16,8 @@ from reportlab.platypus import Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib import colors
 
+import ast
+
 router = APIRouter(
     prefix="/qcyberapi/report",
     tags=["Reports"],
@@ -228,11 +230,34 @@ def generate_detection_report_pdf(detection_id: int, cursor: pymysql.cursors.Dic
                        "Data": detail.get('data_deteccao', 'N/A'), "Status": detail.get('status_resposta', 'N/A'),
                        "Nível de Risco": detail.get('nivel_risco', 'Desconhecido')}
     elements.append(create_key_value_table(info_block_data, pdf.styles))
+    # Adiciona o Resumo Técnico, se existir
+    if detail.get('resumo_tecnico'):
+        elements.extend(create_paragraph("Resumo Técnico", detail['resumo_tecnico'], pdf.styles))
+
+    # Adiciona a Análise Detalhada do LLM, se existir
     if detail.get('explicacao_llm'):
         elements.extend(create_paragraph("Análise Detalhada (LLM)", detail['explicacao_llm'], pdf.styles))
+
+    # Adiciona e formata as Ações Recomendadas, se existirem
     if detail.get('acoes_recomendadas'):
-        acoes = detail['acoes_recomendadas'].replace('•', '\n• ')
-        elements.extend(create_paragraph("Ações Recomendadas", acoes, pdf.styles))
+        try:
+            # Converte a string "['item1', 'item2']" em uma lista real
+            lista_acoes = ast.literal_eval(detail['acoes_recomendadas'])
+
+            # Formata a lista com marcadores e quebras de linha
+            texto_formatado = ""
+            if isinstance(lista_acoes, list):
+                texto_formatado = "<br/>".join([f"• {acao}" for acao in lista_acoes])
+            else:
+                # Se não for uma lista, exibe o texto como está
+                texto_formatado = detail['acoes_recomendadas']
+
+            elements.extend(create_paragraph("Ações Recomendadas", texto_formatado, pdf.styles))
+
+        except (ValueError, SyntaxError):
+            # Se houver erro na conversão, apenas exibe o texto original
+            elements.extend(create_paragraph("Ações Recomendadas", detail['acoes_recomendadas'], pdf.styles))
+
     pdf_bytes = pdf.build(title, elements)
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f"attachment; filename=relatorio_deteccao_{detection_id}.pdf"})
