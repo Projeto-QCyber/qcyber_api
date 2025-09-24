@@ -9,6 +9,7 @@ API para monitoramento de segurança desenvolvida com FastAPI.
 
 ## Estrutura do .env:
 ```
+# Para o SGBD
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_ROOT_PASSWORD=
@@ -16,9 +17,13 @@ MYSQL_DATABASE=qcyber_db
 MYSQL_USER=
 MYSQL_PASSWORD=
 
+# Segurança
 SECRET_KEY=""
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Outros
+FRONTEND_BASE_URL=
 ```
 
 

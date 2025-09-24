@@ -15,7 +15,7 @@ Este script:
 import os
 import pymysql
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 
 
@@ -55,6 +55,7 @@ def seed_data():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
+            port=os.getenv('MYSQL_PORT', '3306'),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=db_name,
@@ -138,7 +139,7 @@ def seed_data():
                 disp_id = random.choice(list(dispositivo_ids_map.keys()))
                 ataque_id = random.choice(tipos_ataque_random)
                 status_resp_id = random.choice(list(ids['status_resp_ids'].values()))
-                data_det = datetime.now() - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
+                data_det = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
                 relatorio = f'Atividade suspeita de ataque código {ataque_id} detectada.'
 
                 # Insere a detecção com incidente_id NULO por padrão
