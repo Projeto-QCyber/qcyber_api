@@ -90,7 +90,10 @@ def verify_2fa_login(
         cursor.connection.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código 2FA inválido.")
 
-    if datetime.now(timezone.utc) > user['codigo_verificacao_expiracao']:
+    expiracao = user['codigo_verificacao_expiracao']
+    if expiracao.tzinfo is None:  # datetime naive
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expiracao:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código 2FA expirado.")
 
     # Sucesso: Limpa os campos e gera o token final

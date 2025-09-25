@@ -79,7 +79,10 @@ def verify_user_email(
                                                                                   user['codigo_verificacao']):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código inválido.")
 
-    if datetime.now(timezone.utc) > user['codigo_verificacao_expiracao']:
+    expiracao = user['codigo_verificacao_expiracao']
+    if expiracao.tzinfo is None:  # datetime naive
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expiracao:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código expirado.")
 
     # Ativa o usuário e limpa os campos de verificação
