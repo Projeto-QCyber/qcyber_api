@@ -3,11 +3,13 @@ import pymysql
 from config import settings
 from fastapi import HTTPException
 
+
 def get_db_connection():
     """Cria e retorna uma conexão com o banco de dados."""
     try:
         connection = pymysql.connect(
             host=settings.MYSQL_HOST,
+            port=settings.MYSQL_PORT,
             user=settings.MYSQL_USER,
             password=settings.MYSQL_PASSWORD,
             database=settings.MYSQL_DATABASE,

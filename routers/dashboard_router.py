@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, Depends, Query
 import pymysql
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 import schemas
@@ -24,7 +24,7 @@ def get_dashboard_summary(
     Aceita um intervalo de datas opcional. Por padrão, retorna as últimas 24 horas.
     """
     if start_date is None or end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=1)
 
     try:
@@ -158,7 +158,7 @@ def get_deteccoes_details(
     Retorna uma lista detalhada das últimas 20 detecções para o modal de KPI.
     """
     if start_date is None or end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=1)
 
     try:
@@ -191,7 +191,7 @@ def get_acoes_details(
 ):
     """Retorna as últimas 20 ações automáticas executadas."""
     if start_date is None or end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=30)
     try:
         query = """
@@ -218,7 +218,7 @@ def get_incidentes_details(
 ):
     """Retorna os últimos 20 incidentes criados."""
     if start_date is None or end_date is None:
-        end_date = datetime.now()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=30)
     try:
         query = """

@@ -7,8 +7,10 @@ import pandas as pd
 import pymysql
 import requests  # Importa a biblioteca para fazer requisições HTTP
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timezone
 
+
+load_dotenv()
 # --- CONFIGURAÇÕES ---
 # Endereço da sua nova API de análise (rodando no desktop)
 # API_ANALISE_URL = "http://192.168.1.68:5000/analisar"
@@ -21,10 +23,10 @@ tempof=20 #sengundos
 # --- FUNÇÕES DE BANCO DE DADOS ---
 def get_db_connection():
     """Cria e retorna uma conexão com o banco de dados MySQL."""
-    load_dotenv()
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
+            port=os.getenv('MYSQL_PORT', '3306'),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=os.getenv('MYSQL_DATABASE', 'qcyber_db'),
@@ -71,7 +73,7 @@ def run_simulator():
     for index, row in attack_data.iterrows():
         try:
             print("\n" + "=" * 50)
-            print(f"[{datetime.now()}] Enviando evento {index + 1}/{len(attack_data)} para análise...")
+            print(f"[{datetime.now(timezone.utc)}] Enviando evento {index + 1}/{len(attack_data)} para análise...")
 
             # Prepara os dados da linha para enviar como JSON
             features = row.drop(["Attack_label", "Attack_type"]).to_dict()

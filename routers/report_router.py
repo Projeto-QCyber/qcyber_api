@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 import pymysql
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 import schemas, security
 from database import get_cursor
 
@@ -55,7 +55,7 @@ class PDFGenerator:
         self.canvas.line(self.margin_x, self.height - 1.25 * inch, self.width - self.margin_x,
                          self.height - 1.25 * inch)
 
-        today_date = datetime.now().strftime("%d/%m/%Y %H:%M")
+        today_date = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
         self.canvas.setFont("Helvetica", 9)
         self.canvas.drawString(self.margin_x, self.bottom_margin_y - 0.2 * inch, f"Gerado em: {today_date}")
         self.canvas.drawRightString(self.width - self.margin_x, self.bottom_margin_y - 0.2 * inch,

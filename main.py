@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from config import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -21,7 +22,12 @@ app = FastAPI(
 # Configuração do CORS (Cross-Origin Resource Sharing)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, restrinja para o domínio do seu frontend
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8008",  # porta do nginx
+        settings.FRONTEND_BASE_URL.replace("/qcyber/", ""),  # removendo a base url do final
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

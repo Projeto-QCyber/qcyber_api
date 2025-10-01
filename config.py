@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
+import os
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 class Settings(BaseSettings):
     """
@@ -7,7 +12,7 @@ class Settings(BaseSettings):
     """
     # Configurações do Banco de Dados
     MYSQL_HOST: str
-    MYSQL_PORT: str
+    MYSQL_PORT: int
     MYSQL_ROOT_PASSWORD: str
     MYSQL_USER: str
     MYSQL_PASSWORD: str
@@ -18,9 +23,8 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    # --- ADICIONE A LINHA ABAIXO ---
     # URL base do frontend para montar links em e-mails
-    FRONTEND_BASE_URL: str = "http://localhost:3000"
+    FRONTEND_BASE_URL: str = str(os.getenv("FRONTEND_BASE_URL"))
 
     class Config:
         env_file = ".env"  # Especifica o arquivo .env a ser lido

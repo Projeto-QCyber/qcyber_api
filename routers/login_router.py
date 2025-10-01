@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 import pymysql
@@ -42,7 +42,7 @@ def login_for_access_token(
         # Gera e envia código 2FA
         code = security.generate_secure_code()
         hashed_code = security.get_password_hash(code)
-        expiration = datetime.utcnow() + timedelta(minutes=5)
+        expiration = datetime.now(timezone.utc) + timedelta(minutes=5)
 
         sql = "UPDATE usuarios SET codigo_verificacao=%s, codigo_verificacao_expiracao=%s, tentativas_verificacao=0 WHERE id=%s"
         cursor.execute(sql, (hashed_code, expiration, user['id']))
@@ -90,7 +90,10 @@ def verify_2fa_login(
         cursor.connection.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Código 2FA inválido.")
 
-    if datetime.utcnow() > user['codigo_verificacao_expiracao']:
+    expiracao = user['codigo_verificacao_expiracao']
+    if expiracao.tzinfo is None:  # datetime naive
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expiracao:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código 2FA expirado.")
 
     # Sucesso: Limpa os campos e gera o token final

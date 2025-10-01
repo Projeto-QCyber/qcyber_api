@@ -3,7 +3,7 @@ import os
 import json
 import random
 import pymysql
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -18,6 +18,7 @@ def get_db_connection():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
+            port=os.getenv('MYSQL_PORT', '3306'),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=os.getenv('MYSQL_DATABASE', 'qcyber_db'),
@@ -128,7 +129,7 @@ def analisar_dados():
                     1,
                     device_id,
                     analise['risco_id'],
-                    datetime.now(),
+                    datetime.now(timezone.utc),
                     analise['resumo'],
                     analise['explicacao_llm'],  # <-- ALTERADO (adicionado o novo campo)
                     json.dumps(analise['acoes'])

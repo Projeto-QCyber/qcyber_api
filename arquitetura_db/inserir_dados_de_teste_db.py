@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 """
 Script para popular o banco de dados qCyber com dados de exemplo (mock data)
-que refletem o fluxo de negócio real (detecção -> ação -> análise).
+que refletem o fluxo de negócio real (detecção -> análise).
+(VERSÃO CORRIGIDA COM VÍNCULO ENTRE DETECÇÕES E INCIDENTES)
 
 Este script:
-1. Limpa as tabelas de dados dinâmicos (deteccoes, incidentes, dispositivos).
-2. Insere dispositivos de exemplo.
-3. Gera um número definido de detecções.
-4. Para uma parte das detecções (ex: 30%), simula uma ação automática executada.
-5. Para outra parte (ex: 75%), gera um incidente analisado correspondente.
-6. Vincula corretamente as detecções aos seus incidentes.
+1. Limpa as tabelas de dados dinâmicos.
+2. Insere dispositivos.
+3. Para cada detecção criada, decide aleatoriamente se um incidente
+   analisado correspondente deve ser gerado.
+4. Se um incidente é gerado, o `id` dele é usado para atualizar a detecção
+   original, criando o vínculo correto na coluna `incidente_id`.
 """
 import os
 import pymysql
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 
 
@@ -54,6 +55,7 @@ def seed_data():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
+            port=os.getenv('MYSQL_PORT', '3306'),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=db_name,
@@ -91,10 +93,12 @@ def seed_data():
                 "status_resp_ids": get_lookup_ids(cursor, "enum_status_resposta"),
                 "acao_ids": get_lookup_ids(cursor, "enum_acao_executada"),
             }
+            # Checagem de erro robusta
             for key, value in ids.items():
                 if value is None or not value:
                     raise Exception(
                         f"Falha ao carregar ou tabela enum vazia para '{key}'. Popule as tabelas 'enum' primeiro.")
+
             print("✅ IDs carregados.")
 
             # PASSO 2: Inserir Dispositivos
@@ -116,11 +120,12 @@ def seed_data():
             print(f"  - {len(dispositivo_ids_map)} dispositivos inseridos.")
             conn.commit()
 
-            # PASSO 3: Gerar Detecções e, para algumas, seus Incidentes e Ações correspondentes
-            print("\nPASSO 3: Gerando detecções, ações e incidentes...")
+            # --- INÍCIO DA LÓGICA CORRIGIDA ---
+
+            # PASSO 3: Gerar Detecções e, para algumas, seus Incidentes correspondentes
+            print("\nPASSO 3: Gerando detecções e vinculando incidentes analisados...")
             total_deteccoes = 200
             incidentes_criados = 0
-            acoes_executadas = 0
             tipos_ataque_random = [0, 1, 5, 6, 7, 8, 9, 10, 12, 13]
             riscos_ponderados = [
                 ids['risco_ids']['Crítico'], ids['risco_ids']['Crítico'],
@@ -128,38 +133,29 @@ def seed_data():
                 ids['risco_ids']['Médio'], ids['risco_ids']['Médio'],
                 ids['risco_ids']['Baixo']
             ]
-            acoes_possiveis = list(ids['acao_ids'].values())
 
             for i in range(total_deteccoes):
-                # 1. Prepara dados da detecção
+                # 1. Cria a detecção
                 disp_id = random.choice(list(dispositivo_ids_map.keys()))
                 ataque_id = random.choice(tipos_ataque_random)
-                status_resp_id = ids['status_resp_ids']['Pendente']
-                data_det = datetime.now() - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
+                status_resp_id = random.choice(list(ids['status_resp_ids'].values()))
+                data_det = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
                 relatorio = f'Atividade suspeita de ataque código {ataque_id} detectada.'
 
-                acao_id, acao_param, data_acao = None, None, None
-
-                # --- NOVA LÓGICA PARA SIMULAR AÇÃO ---
-                if random.random() < 0.30: # 30% de chance de ter uma ação
-                    acoes_executadas += 1
-                    acao_id = random.choice(acoes_possiveis)
-                    acao_param = f"10.0.{random.randint(1, 254)}.{random.randint(1, 254)}"
-                    data_acao = data_det + timedelta(seconds=random.randint(5, 60))
-                    status_resp_id = ids['status_resp_ids']['Ação Automática Executada']
-
-                # 2. Insere a detecção com os campos de ação (que podem ser NULL)
+                # Insere a detecção com incidente_id NULO por padrão
                 cursor.execute(
                     """INSERT INTO deteccoes (data_deteccao, dispositivo_id, predicao, tipo_ataque_id, relatorio_api,
-                                              status_resposta_id, incidente_id, acao_executada_id, acao_parametro, data_acao_executada)
-                       VALUES (%s, %s, %s, %s, %s, %s, NULL, %s, %s, %s)""",
-                    (data_det, disp_id, ataque_id, ataque_id, relatorio, status_resp_id, acao_id, acao_param, data_acao)
+                                              status_resposta_id, incidente_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, NULL)""",
+                    (data_det, disp_id, ataque_id, ataque_id, relatorio, status_resp_id)
                 )
                 nova_deteccao_id = cursor.lastrowid
 
-                # 3. Decide se gera um incidente para esta detecção (75% de chance)
+                # 2. Decide se gera um incidente para esta detecção (75% de chance)
                 if random.random() < 0.75:
                     incidentes_criados += 1
+
+                    # 3. Cria o incidente analisado correspondente
                     risco_id = random.choice(riscos_ponderados)
                     titulo = f"Análise do Incidente para Detecção #{nova_deteccao_id}"
                     status_id = random.choice(list(ids['status_inc_ids'].values()))
@@ -180,9 +176,10 @@ def seed_data():
                     )
 
             print(f"  - {total_deteccoes} detecções aleatórias inseridas.")
-            print(f"  - {acoes_executadas} ações automáticas foram simuladas.")
             print(f"  - {incidentes_criados} incidentes analisados foram criados e vinculados.")
             conn.commit()
+
+            # --- FIM DA LÓGICA CORRIGIDA ---
 
             print("\n🎉 Dados de exemplo inseridos com sucesso e com vínculos corretos!")
 
@@ -198,6 +195,8 @@ def seed_data():
 
 
 if __name__ == '__main__':
+    # Cria um arquivo .env de exemplo se não existir.
+    # Em um ambiente real, este arquivo deve ser criado manualmente e não deve ser versionado.
     if not os.path.exists('.env'):
         print("Arquivo .env não encontrado. Criando um com valores padrão (localhost)...")
         with open('.env', 'w') as f:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 import pymysql
 
@@ -36,7 +36,7 @@ def create_user(
     hashed_password = security.get_password_hash(user.senha)
     verification_code = security.generate_secure_code()
     hashed_code = security.get_password_hash(verification_code)
-    expiration_time = datetime.utcnow() + timedelta(minutes=5)
+    expiration_time = datetime.now(timezone.utc) + timedelta(minutes=5)
 
     try:
         sql = """
@@ -79,7 +79,10 @@ def verify_user_email(
                                                                                   user['codigo_verificacao']):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código inválido.")
 
-    if datetime.utcnow() > user['codigo_verificacao_expiracao']:
+    expiracao = user['codigo_verificacao_expiracao']
+    if expiracao.tzinfo is None:  # datetime naive
+        expiracao = expiracao.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expiracao:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código expirado.")
 
     # Ativa o usuário e limpa os campos de verificação
@@ -121,7 +124,7 @@ def request_password_reset(
     if user:
         token = security.generate_secure_code(length=32)
         hashed_token = security.get_password_hash(token)
-        expiration = datetime.utcnow() + timedelta(hours=1)  # Token válido por 1 hora
+        expiration = datetime.now(timezone.utc) + timedelta(hours=1)  # Token válido por 1 hora
 
         cursor.execute(
             "UPDATE usuarios SET reset_senha_token=%s, reset_senha_expiracao=%s WHERE id=%s",
@@ -166,7 +169,7 @@ def perform_password_reset(
     if not target_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido.")
 
-    if datetime.utcnow() > target_user['reset_senha_expiracao']:
+    if datetime.now(timezone.utc) > target_user['reset_senha_expiracao']:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado.")
 
     # Tudo certo, atualiza a senha
