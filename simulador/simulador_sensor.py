@@ -14,8 +14,8 @@ from datetime import datetime
 # API_ANALISE_URL = "http://192.168.1.68:5000/analisar"
 API_ANALISE_URL = "http://127.0.0.1:5000/analisar"
 DATA_PATH = "../data/dados_de_teste.csv"
-tempoi=20 #segundos
-tempof=50 #sengundos
+tempoi=10 #segundos
+tempof=20 #sengundos
 
 
 # --- FUNÇÕES DE BANCO DE DADOS ---

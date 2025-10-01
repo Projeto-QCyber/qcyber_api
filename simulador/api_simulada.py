@@ -104,9 +104,9 @@ def analisar_dados():
             tipo_ataque_nome = cursor.fetchone()['nome']
 
             sql_deteccao = """
-                           INSERT INTO deteccoes (dispositivo_id, predicao, tipo_ataque_id, relatorio_api, \
+                           INSERT INTO deteccoes (dispositivo_id, predicao, tipo_ataque_id, relatorio_api, 
                                                   status_resposta_id)
-                           VALUES (%s, %s, %s, %s, %s) \
+                           VALUES (%s, %s, %s, %s, %s) 
                            """
             cursor.execute(sql_deteccao,
                            (device_id, predicao, predicao, f"Simulação: Detectado '{tipo_ataque_nome}'", 1))
@@ -118,9 +118,9 @@ def analisar_dados():
 
                 sql_incidente = """
                                 INSERT INTO incidentes_analisados
-                                (titulo, status_id, dispositivo_id, nivel_risco_id, data_deteccao, resumo_tecnico, \
+                                (titulo, status_id, dispositivo_id, nivel_risco_id, data_deteccao, resumo_tecnico, 
                                  explicacao_llm, acoes_recomendadas)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) \
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
                                 """  # <-- ALTERADO (adicionado explicacao_llm)
 
                 cursor.execute(sql_incidente, (
