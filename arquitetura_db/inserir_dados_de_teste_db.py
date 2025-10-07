@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Script para popular o banco de dados qCyber com dados de exemplo (mock data)
-que refletem o fluxo de negócio real (detecção -> ação -> análise).
+Script to populate the qCyber database with mock data that reflects
+the real business flow (detection -> action -> analysis).
 
-Este script:
-1. Limpa as tabelas de dados dinâmicos (deteccoes, incidentes, dispositivos).
-2. Insere dispositivos de exemplo.
-3. Gera um número definido de detecções.
-4. Para uma parte das detecções (ex: 30%), simula uma ação automática executada.
-5. Para outra parte (ex: 75%), gera um incidente analisado correspondente.
-6. Vincula corretamente as detecções aos seus incidentes.
+This script:
+1. Clears dynamic data tables (deteccoes, incidentes_analisados, dispositivos)
+   and relevant enum tables.
+2. Inserts example devices with their statuses.
+3. Generates a defined number of detections.
+4. For a portion of detections (e.g., 30%), simulates an automated action.
+5. For another portion (e.g., 75%), generates a corresponding analyzed incident.
+6. Correctly links detections to their incidents.
 """
 import os
 import pymysql
@@ -19,35 +20,62 @@ import random
 
 
 def get_lookup_ids(cursor, table_name):
-    """Busca IDs e nomes de uma tabela de lookup."""
+    """Fetches IDs and names from a lookup table."""
     try:
         cursor.execute(f"SELECT id, nome FROM {table_name}")
         result = cursor.fetchall()
         if not result:
-            print(f"⚠️ AVISO: A tabela de lookup '{table_name}' está vazia.")
+            print(f"⚠️ WARNING: Lookup table '{table_name}' is empty.")
             return {}
         return {row['nome']: row['id'] for row in result}
     except pymysql.Error as e:
-        print(f"❌ ERRO ao buscar dados da tabela '{table_name}': {e}")
+        print(f"❌ ERROR fetching data from table '{table_name}': {e}")
         return None
 
 
 def ensure_risk_levels(cursor):
-    """Garante que todos os níveis de risco necessários existam na tabela."""
-    print("  - Verificando e inserindo níveis de risco...")
-    risk_levels = ["Baixo", "Médio", "Alto", "Crítico", "Desconhecido"]
+    """Ensures that all necessary risk levels exist in the table."""
+    print("  - Verifying and inserting risk levels...")
+    risk_levels = ["Low", "Medium", "High", "Critical", "Unknown"]
     try:
         for level in risk_levels:
+            # INSERT IGNORE does not insert if the 'nome' already exists (assuming 'nome' is UNIQUE)
             cursor.execute("INSERT IGNORE INTO enum_nivel_risco (nome) VALUES (%s)", (level,))
-        print("  - Níveis de risco garantidos.")
+        print("  - Risk levels ensured.")
         return True
     except pymysql.Error as e:
-        print(f"❌ ERRO ao inserir níveis de risco: {e}")
+        print(f"❌ ERROR inserting risk levels: {e}")
+        return False
+
+def ensure_device_statuses(cursor):
+    """Ensures that all necessary device statuses exist in the table."""
+    print("  - Verifying and inserting device statuses...")
+    statuses = ["Active", "Inactive", "Maintenance"]
+    try:
+        for status in statuses:
+            cursor.execute("INSERT IGNORE INTO enum_status_dispositivo (nome) VALUES (%s)", (status,))
+        print("  - Device statuses ensured.")
+        return True
+    except pymysql.Error as e:
+        print(f"❌ ERROR inserting device statuses: {e}")
+        return False
+
+def ensure_response_statuses(cursor):
+    """Ensures that all necessary response statuses exist in the table."""
+    print("  - Verifying and inserting response statuses...")
+    statuses = ["Pending", "Automated Action Executed", "Analysis Complete", "False Positive"]
+    try:
+        for status in statuses:
+            cursor.execute("INSERT IGNORE INTO enum_status_resposta (nome) VALUES (%s)", (status,))
+        print("  - Response statuses ensured.")
+        return True
+    except pymysql.Error as e:
+        print(f"❌ ERROR inserting response statuses: {e}")
         return False
 
 
 def seed_data():
-    """Conecta ao banco e insere os dados de exemplo."""
+    """Connects to the database and inserts the mock data."""
     load_dotenv()
     db_name = os.getenv('MYSQL_DB', 'qcyber_db')
 
@@ -60,30 +88,35 @@ def seed_data():
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor
         )
-        print(f"✅ Conectado ao banco de dados '{db_name}' com sucesso!")
+        print(f"✅ Successfully connected to database '{db_name}'!")
     except pymysql.err.OperationalError as e:
-        print(f"❌ ERRO: Falha ao conectar ao banco. Verifique as credenciais, o host e se o banco '{db_name}' existe.")
-        print(f"   Detalhes: {e}")
+        print(f"❌ ERROR: Failed to connect to the database. Check credentials, host, and if the database '{db_name}' exists.")
+        print(f"   Details: {e}")
         return
 
     try:
         with conn.cursor() as cursor:
-            # PASSO 0: Limpar tabelas
-            print("\nPASSO 0: Limpando tabelas antigas...")
+            # STEP 0: Clean up old tables
+            print("\nSTEP 0: Cleaning up old tables...")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
             cursor.execute("TRUNCATE TABLE deteccoes;")
             cursor.execute("TRUNCATE TABLE incidentes_analisados;")
             cursor.execute("TRUNCATE TABLE dispositivos;")
+            # Also truncate enum tables that will be re-populated
             cursor.execute("TRUNCATE TABLE enum_nivel_risco;")
+            cursor.execute("TRUNCATE TABLE enum_status_dispositivo;")
+            cursor.execute("TRUNCATE TABLE enum_status_resposta;")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
-            print("  - Tabelas de dados dinâmicos limpas.")
+            print("  - Dynamic data and enum tables have been cleared.")
 
-            # PASSO 1: Garantir e carregar dados base
-            if not ensure_risk_levels(cursor):
-                raise Exception("Não foi possível garantir os níveis de risco.")
+            # STEP 1: Ensure and load base data
+            if not ensure_risk_levels(cursor) or \
+               not ensure_device_statuses(cursor) or \
+               not ensure_response_statuses(cursor):
+                raise Exception("Failed to ensure base enum data.")
             conn.commit()
 
-            print("\nPASSO 1: Carregando IDs das tabelas de Enum...")
+            print("\nSTEP 1: Loading IDs from Enum tables...")
             ids = {
                 "status_disp_ids": get_lookup_ids(cursor, "enum_status_dispositivo"),
                 "status_inc_ids": get_lookup_ids(cursor, "enum_status_incidente"),
@@ -94,74 +127,74 @@ def seed_data():
             for key, value in ids.items():
                 if value is None or not value:
                     raise Exception(
-                        f"Falha ao carregar ou tabela enum vazia para '{key}'. Popule as tabelas 'enum' primeiro.")
-            print("✅ IDs carregados.")
+                        f"Failed to load or enum table is empty for '{key}'. Please populate the 'enum' tables first.")
+            print("✅ IDs loaded successfully.")
 
-            # PASSO 2: Inserir Dispositivos
-            print("\nPASSO 2: Inserindo dispositivos...")
+            # STEP 2: Insert Devices
+            print("\nSTEP 2: Inserting devices...")
             dispositivos_data = [
-                ('Servidor de Aplicação Principal', '192.168.1.10', 'Data Center A',
-                 ids['status_disp_ids'].get('Ativo')),
-                ('Servidor de Banco de Dados', '192.168.1.15', 'Data Center A', ids['status_disp_ids'].get('Ativo')),
-                ('Estação de Trabalho - Finanças', '10.0.5.22', 'Escritório Central',
-                 ids['status_disp_ids'].get('Ativo')),
-                ('Gateway de Rede', '192.168.0.1', 'Sala de Servidores', ids['status_disp_ids'].get('Ativo')),
-                ('Servidor Web - Legado', '192.168.2.50', 'Data Center B', ids['status_disp_ids'].get('Inativo'))
+                ('Main Application Server', '192.168.1.10', 'Data Center A',
+                 ids['status_disp_ids'].get('Active')),
+                ('Database Server', '192.168.1.15', 'Data Center A', ids['status_disp_ids'].get('Active')),
+                ('Workstation - Finance', '10.0.5.22', 'Central Office',
+                 ids['status_disp_ids'].get('Active')),
+                ('Network Gateway', '192.168.0.1', 'Server Room', ids['status_disp_ids'].get('Active')),
+                ('Web Server - Legacy', '192.168.2.50', 'Data Center B', ids['status_disp_ids'].get('Inactive'))
             ]
             dispositivo_ids_map = {}
             for nome, host, localizacao, status_id in dispositivos_data:
                 cursor.execute("INSERT INTO dispositivos (nome, host, localizacao, status_id) VALUES (%s, %s, %s, %s)",
                                (nome, host, localizacao, status_id))
                 dispositivo_ids_map[cursor.lastrowid] = nome
-            print(f"  - {len(dispositivo_ids_map)} dispositivos inseridos.")
+            print(f"  - {len(dispositivo_ids_map)} devices inserted.")
             conn.commit()
 
-            # PASSO 3: Gerar Detecções e, para algumas, seus Incidentes e Ações correspondentes
-            print("\nPASSO 3: Gerando detecções, ações e incidentes...")
-            total_deteccoes = 200
-            incidentes_criados = 0
-            acoes_executadas = 0
+            # STEP 3: Generate Detections and, for some, their corresponding Incidents and Actions
+            print("\nSTEP 3: Generating detections, actions, and incidents...")
+            total_detections = 200
+            incidents_created = 0
+            actions_executed = 0
             tipos_ataque_random = [0, 1, 5, 6, 7, 8, 9, 10, 12, 13]
             riscos_ponderados = [
-                ids['risco_ids']['Crítico'], ids['risco_ids']['Crítico'],
-                ids['risco_ids']['Alto'], ids['risco_ids']['Alto'], ids['risco_ids']['Alto'],
-                ids['risco_ids']['Médio'], ids['risco_ids']['Médio'],
-                ids['risco_ids']['Baixo']
+                ids['risco_ids']['Critical'], ids['risco_ids']['Critical'],
+                ids['risco_ids']['High'], ids['risco_ids']['High'], ids['risco_ids']['High'],
+                ids['risco_ids']['Medium'], ids['risco_ids']['Medium'],
+                ids['risco_ids']['Low']
             ]
             acoes_possiveis = list(ids['acao_ids'].values())
 
-            for i in range(total_deteccoes):
-                # 1. Prepara dados da detecção
+            for i in range(total_detections):
+                # 1. Prepare detection data
                 disp_id = random.choice(list(dispositivo_ids_map.keys()))
                 ataque_id = random.choice(tipos_ataque_random)
-                status_resp_id = ids['status_resp_ids']['Pendente']
+                status_resp_id = ids['status_resp_ids']['Pending']
                 data_det = datetime.now() - timedelta(days=random.randint(0, 89), hours=random.randint(0, 23))
-                relatorio = f'Atividade suspeita de ataque código {ataque_id} detectada.'
+                relatorio = f'Suspicious activity from attack code {ataque_id} detected.'
 
                 acao_id, acao_param, data_acao = None, None, None
 
-                # --- NOVA LÓGICA PARA SIMULAR AÇÃO ---
-                if random.random() < 0.30: # 30% de chance de ter uma ação
-                    acoes_executadas += 1
+                # --- NEW LOGIC TO SIMULATE ACTION ---
+                if random.random() < 0.30: # 30% chance of having an action
+                    actions_executed += 1
                     acao_id = random.choice(acoes_possiveis)
                     acao_param = f"10.0.{random.randint(1, 254)}.{random.randint(1, 254)}"
                     data_acao = data_det + timedelta(seconds=random.randint(5, 60))
-                    status_resp_id = ids['status_resp_ids']['Ação Automática Executada']
+                    status_resp_id = ids['status_resp_ids']['Automated Action Executed']
 
-                # 2. Insere a detecção com os campos de ação (que podem ser NULL)
+                # 2. Insert the detection with action fields (which can be NULL)
                 cursor.execute(
                     """INSERT INTO deteccoes (data_deteccao, dispositivo_id, predicao, tipo_ataque_id, relatorio_api,
                                               status_resposta_id, incidente_id, acao_executada_id, acao_parametro, data_acao_executada)
                        VALUES (%s, %s, %s, %s, %s, %s, NULL, %s, %s, %s)""",
                     (data_det, disp_id, ataque_id, ataque_id, relatorio, status_resp_id, acao_id, acao_param, data_acao)
                 )
-                nova_deteccao_id = cursor.lastrowid
+                new_detection_id = cursor.lastrowid
 
-                # 3. Decide se gera um incidente para esta detecção (75% de chance)
+                # 3. Decide if an incident should be generated for this detection (75% chance)
                 if random.random() < 0.75:
-                    incidentes_criados += 1
+                    incidents_created += 1
                     risco_id = random.choice(riscos_ponderados)
-                    titulo = f"Análise do Incidente para Detecção #{nova_deteccao_id}"
+                    titulo = f"Incident Analysis for Detection #{new_detection_id}"
                     status_id = random.choice(list(ids['status_inc_ids'].values()))
 
                     cursor.execute(
@@ -169,46 +202,48 @@ def seed_data():
                                                               data_deteccao, resumo_tecnico)
                            VALUES (%s, %s, %s, %s, %s, %s)""",
                         (titulo, status_id, disp_id, risco_id, data_det,
-                         "Evento gerado e analisado automaticamente para teste.")
+                         "Event automatically generated and analyzed for testing.")
                     )
-                    novo_incidente_id = cursor.lastrowid
+                    new_incident_id = cursor.lastrowid
 
-                    # 4. ATUALIZA a detecção original com o ID do novo incidente
+                    # 4. UPDATE the original detection with the new incident's ID
                     cursor.execute(
                         "UPDATE deteccoes SET incidente_id = %s WHERE id = %s",
-                        (novo_incidente_id, nova_deteccao_id)
+                        (new_incident_id, new_detection_id)
                     )
 
-            print(f"  - {total_deteccoes} detecções aleatórias inseridas.")
-            print(f"  - {acoes_executadas} ações automáticas foram simuladas.")
-            print(f"  - {incidentes_criados} incidentes analisados foram criados e vinculados.")
+            print(f"  - {total_detections} random detections inserted.")
+            print(f"  - {actions_executed} automated actions were simulated.")
+            print(f"  - {incidents_created} analyzed incidents were created and linked.")
             conn.commit()
 
-            print("\n🎉 Dados de exemplo inseridos com sucesso e com vínculos corretos!")
+            print("\n🎉 Mock data inserted successfully with correct links!")
 
     except Exception as e:
-        print(f"❌ ERRO durante a execução: {e}")
+        print(f"❌ ERROR during execution: {e}")
         if 'conn' in locals() and conn.open:
             conn.rollback()
-            print("  - Rollback executado.")
+            print("  - Rollback executed.")
     finally:
         if 'conn' in locals() and conn.open:
             conn.close()
-            print("\n🔌 Conexão com o banco de dados fechada.")
+            print("\n🔌 Database connection closed.")
 
 
 if __name__ == '__main__':
     if not os.path.exists('.env'):
-        print("Arquivo .env não encontrado. Criando um com valores padrão (localhost)...")
+        print("'.env' file not found. Creating one with default values (localhost)...")
         with open('.env', 'w') as f:
             f.write("MYSQL_HOST=localhost\n")
             f.write("MYSQL_USER=root\n")
             f.write("MYSQL_PASSWORD=root\n")
             f.write("MYSQL_DB=qcyber_db\n")
 
-    print(f"Este script irá LIMPAR e REINSERIR dados no banco '{os.getenv('MYSQL_DB', 'qcyber_db')}'")
-    resposta = input("ATENÇÃO: DADOS ANTERIORES SERÃO APAGADOS. Deseja continuar? (s/N): ")
-    if resposta.lower() in ['s', 'sim']:
+    db_env = os.getenv('MYSQL_DB', 'qcyber_db')
+    print(f"This script will CLEAR and RE-INSERT data into the '{db_env}' database.")
+    # In English
+    response = input("ATTENTION: PREVIOUS DATA WILL BE DELETED. Do you wish to continue? (y/N): ")
+    if response.lower() in ['y', 'yes']:
         seed_data()
     else:
-        print("Operação cancelada.")
+        print("Operation canceled.")
