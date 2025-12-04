@@ -42,17 +42,31 @@ def generate_secure_code(length: int = 6) -> str:
 # ====================
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Cria um novo token de acesso (JWT)."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    to_encode.update({"exp": expire})
+    # ADICIONADO: 'type': 'access'
+    to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+
+# Adicione esta NOVA função
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        # Usa a nova configuração de DIAS
+        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    # ADICIONADO: 'type': 'refresh'
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
 
 def decode_access_token(token: str, credentials_exception: HTTPException) -> Dict:
     try:
@@ -71,6 +85,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), cursor: pymysql.cursor
         headers={"WWW-Authenticate": "Bearer"},
     )
     payload = decode_access_token(token, credentials_exception)
+
+    if payload.get("type") != "access":
+        raise credentials_exception
+
     if payload.get("scope") == "2fa_login":
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -96,3 +114,10 @@ def get_current_admin_user(current_user: dict = Depends(get_current_user)):
             detail="Acesso negado: privilégios de administrador necessários."
         )
     return current_user
+
+def is_token_blacklisted(token: str, cursor: pymysql.cursors.DictCursor) -> bool:
+    """Verifica se o token está na lista negra (foi revogado)."""
+    sql = "SELECT id FROM token_blacklist WHERE token = %s LIMIT 1"
+    cursor.execute(sql, (token,))
+    result = cursor.fetchone()
+    return result is not None

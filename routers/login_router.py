@@ -2,7 +2,10 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError, jwt  # <--- Importante: Adicionado para decodificar o token manualmente
 import pymysql
+
+from datetime import datetime, timezone
 
 import schemas
 import security
@@ -24,6 +27,7 @@ def login_for_access_token(
 ):
     """
     Endpoint de login. Se o 2FA estiver ativo, envia código por e-mail e retorna token temporário.
+    Caso contrário, retorna access_token e refresh_token.
     """
     cursor.execute("SELECT * FROM usuarios WHERE email = %s", (form_data.username,))
     user = cursor.fetchone()
@@ -58,9 +62,15 @@ def login_for_access_token(
         response.status_code = status.HTTP_202_ACCEPTED
         return {"message": "Autenticação de dois fatores necessária.", "temp_token": temp_token}
 
-    # Login normal
+    # Login normal (Sucesso)
     access_token = security.create_access_token(data={"sub": user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = security.create_refresh_token(data={"sub": user["email"]})  # <--- Novo
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 
 @router.post("/token/2fa", response_model=schemas.Token)
@@ -68,7 +78,7 @@ def verify_2fa_login(
         verification_data: schemas.TwoFactorVerify,
         cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
 ):
-    """Verifica o código 2FA do e-mail e retorna o token de acesso final."""
+    """Verifica o código 2FA do e-mail e retorna os tokens de acesso final."""
     token_data = security.decode_access_token(
         token=verification_data.temp_token,
         credentials_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,4 +109,104 @@ def verify_2fa_login(
     cursor.connection.commit()
 
     access_token = security.create_access_token(data={"sub": user["email"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+    refresh_token = security.create_refresh_token(data={"sub": user["email"]})  # <--- Novo
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
+@router.post("/refresh", response_model=schemas.Token)
+def refresh_token(
+        token_data: schemas.TokenRefresh,
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+):
+    """
+    Recebe um Refresh Token válido e retorna um novo par de tokens.
+    Verifica se o token foi revogado (Logout).
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token inválido, expirado ou revogado.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    # 1. Verifica na Blacklist ANTES de decodificar (economiza CPU)
+    if security.is_token_blacklisted(token_data.refresh_token, cursor):
+        raise credentials_exception
+
+    try:
+        payload = jwt.decode(token_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        token_type: str = payload.get("type")
+
+        if email is None or token_type != "refresh":
+            raise credentials_exception
+
+    except JWTError:
+        raise credentials_exception
+
+    cursor.execute("SELECT * FROM usuarios WHERE email = %s", (email,))
+    user = cursor.fetchone()
+
+    if not user or not user.get('ativo', True):
+        raise credentials_exception
+
+    # Opcional: Se você quiser fazer rotação de token (o refresh token muda a cada uso)
+    # você deve adicionar o token antigo na blacklist AQUI.
+    # Por enquanto, vamos manter simples (apenas renova o access).
+
+    new_access_token = security.create_access_token(data={"sub": email})
+    # Se quiser manter o mesmo refresh token até expirar, devolva o mesmo.
+    # Se quiser gerar um novo (mais seguro), gere um novo aqui.
+    new_refresh_token = security.create_refresh_token(data={"sub": email})
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
+
+
+# --- NOVA ROTA DE LOGOUT ---
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+        token_data: schemas.TokenRevoke,
+        cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
+):
+    """
+    Revoga um token (Logout). Adiciona o token à Blacklist até sua data de expiração.
+    """
+    try:
+        # Decodificamos sem verificar assinatura rigorosamente apenas para pegar a data de expiração
+        # Mas é bom validar para não sujar o banco com lixo
+        payload = jwt.decode(token_data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+
+        # Pega o email para achar o ID do usuário (opcional, mas bom para auditoria)
+        email = payload.get("sub")
+        exp_timestamp = payload.get("exp")
+
+        # Converte timestamp UNIX para datetime
+        expiration_date = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+
+        # Busca ID do usuário
+        cursor.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        user_id = user['id'] if user else None
+
+        # Insere na Blacklist
+        sql = """
+            INSERT INTO token_blacklist (token, tipo_token, usuario_id, data_expiracao)
+            VALUES (%s, %s, %s, %s)
+        """
+        cursor.execute(sql, (token_data.token, payload.get("type", "refresh"), user_id, expiration_date))
+        cursor.connection.commit()
+
+    except Exception as e:
+        # Se o token for inválido, tecnicamente o usuário já está "deslogado",
+        # então não precisamos retornar erro 500, apenas ignoramos ou retornamos 204.
+        pass
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
