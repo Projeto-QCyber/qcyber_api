@@ -1,0 +1,6 @@
+FROM nginx:alpine3.23
+# Remove configuração padrão #TODO: remover o trecho abaixo
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Define o diretório onde o frontend estará montado pelo volume
+WORKDIR /var/www

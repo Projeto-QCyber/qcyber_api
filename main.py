@@ -25,7 +25,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "http://localhost:8008",  # porta do nginx
+        f"http://localhost:{settings.NGINX_PORT}",  # nginx
+        f"http://127.0.0.1:{settings.NGINX_PORT}",  # nginx
         settings.FRONTEND_BASE_URL.replace("/qcyber/", ""),  # removendo a base url do final
     ],
     allow_credentials=True,

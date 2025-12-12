@@ -1,6 +1,6 @@
 # QCyber Security API
 
-API para monitoramento de segurança desenvolvida com FastAPI.
+API para monitoramento de segurança desenvolvida com FastAPI. Esta é a "API Principal".
 
 ### Pré-requisitos
 
@@ -9,9 +9,9 @@ API para monitoramento de segurança desenvolvida com FastAPI.
 
 ## Estrutura do .env:
 ```
-# Para o SGBD
+# Para o SGBD  (mesmas configurações do repositório QML em relação ao SGBD)
 MYSQL_HOST=localhost
-MYSQL_PORT=3306
+MYSQL_PORT=5000
 MYSQL_ROOT_PASSWORD=
 MYSQL_DATABASE=qcyber_db
 MYSQL_USER=
@@ -24,6 +24,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Outros
 FRONTEND_BASE_URL=
+NGINX_PORT=4545
 ```
 
 

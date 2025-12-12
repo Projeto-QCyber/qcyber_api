@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # URL base do frontend para montar links em e-mails
     FRONTEND_BASE_URL: str = str(os.getenv("FRONTEND_BASE_URL"))
 
+    # Porta NGINX
+    NGINX_PORT: str = str(os.getenv("NGINX_PORT"))
+
     class Config:
         env_file = ".env"  # Especifica o arquivo .env a ser lido
         case_sensitive = True
