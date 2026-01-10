@@ -11,11 +11,18 @@ from typing import List, Optional
 class Token(BaseModel):
     """Schema para o token de acesso final."""
     access_token: str
+    refresh_token: str
     token_type: str
 
 class TokenData(BaseModel):
     """Schema para os dados decodificados do token."""
     email: Optional[str] = None
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
+
+class TokenRevoke(BaseModel):
+    token: str # O token que será cancelado (Refresh Token)
 
 class UserBase(BaseModel):
     """Schema base para dados do usuário."""

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Script final e completo para recriar o banco de dados do projeto qCyber.
-Esta versão une a estrutura original com as novas funcionalidades de autenticação.
+Versão atualizada com a tabela de Blacklist para Logout.
 """
 import os
 import pymysql
@@ -176,6 +176,7 @@ def recreate_database():
 
             print("\nPASSO 4: Criando tabelas principais com chaves estrangeiras...")
 
+            # Tabela de Usuários
             cursor.execute("""
                            CREATE TABLE usuarios
                            (
@@ -202,9 +203,27 @@ def recreate_database():
                                INDEX                        idx_email (email)
                            ) ENGINE=InnoDB
                            """)
-
             print("✅ Tabela 'usuarios' criada.")
 
+            # --- NOVO: Tabela de Blacklist para Logout ---
+            cursor.execute("""
+                           CREATE TABLE token_blacklist
+                           (
+                               id             INT AUTO_INCREMENT PRIMARY KEY,
+                               token          VARCHAR(512) NOT NULL, 
+                               tipo_token     VARCHAR(50) DEFAULT 'refresh',
+                               usuario_id     INT,
+                               data_revogacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                               data_expiracao TIMESTAMP NOT NULL, 
+
+                               FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
+                               INDEX idx_token (token)
+                           ) ENGINE=InnoDB
+                           """)
+            print("✅ Tabela 'token_blacklist' criada.")
+            # ---------------------------------------------
+
+            # Log de Atividades
             cursor.execute("""
                            CREATE TABLE log_atividades_usuarios
                            (
@@ -220,6 +239,7 @@ def recreate_database():
                            """)
             print("✅ Tabela 'log_atividades_usuarios' criada.")
 
+            # Tabelas de Análise e Detecção
             cursor.execute("""
                            CREATE TABLE qcyber_analises_vqc
                            (

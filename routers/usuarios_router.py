@@ -40,8 +40,8 @@ def create_user(
 
     try:
         sql = """
-              INSERT INTO usuarios (nome, email, senha_hash, codigo_verificacao, codigo_verificacao_expiracao)
-              VALUES (%s, %s, %s, %s, %s) 
+              INSERT INTO usuarios (nome, email, senha_hash, codigo_verificacao, codigo_verificacao_expiracao, dois_fatores_ativo)
+              VALUES (%s, %s, %s, %s, %s, 1) 
               """
         cursor.execute(sql, (user.nome, user.email, hashed_password, hashed_code, expiration_time))
 
