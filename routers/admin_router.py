@@ -59,7 +59,7 @@ def update_user_permissions(
 
 @router.get("/settings", response_model=dict)
 def get_system_settings(cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
-    """Retorna todas as configurações do sistema da tabela 'configuracoes'."""
+    """Retorna chaves da tabela 'configuracoes' (SMTP é configurado via .env, não pelo banco)."""
     try:
         cursor.execute("SELECT chave, valor FROM configuracoes")
         settings_list = cursor.fetchall()
@@ -67,24 +67,6 @@ def get_system_settings(cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
         settings_dict = {item['chave']: item['valor'] for item in settings_list}
         return settings_dict
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-
-@router.put("/settings", status_code=status.HTTP_204_NO_CONTENT)
-def update_system_settings(
-    settings: schemas.SettingsUpdate,
-    cursor: pymysql.cursors.DictCursor = Depends(get_cursor)
-):
-    """Atualiza múltiplos parâmetros do sistema em uma única transação."""
-    try:
-        # Usamos executemany para atualizar todas as chaves de uma vez
-        update_data = [(v, k) for k, v in settings.model_dump().items()]
-        query = "UPDATE configuracoes SET valor = %s WHERE chave = %s"
-        cursor.executemany(query, update_data)
-        cursor.connection.commit()
-        return
-    except Exception as e:
-        cursor.connection.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
@@ -119,7 +101,7 @@ def admin_reset_user_password(
     Recomendamos que você faça login e altere esta senha o mais rápido possível.
     """
     # (A função de enviar e-mail precisa ser adaptada para aceitar um corpo HTML)
-    email_service.send_email_html(user['email'], subject, email_body, cursor) # Supõe que criaremos essa função
+    email_service.send_email_html(user['email'], subject, email_body)
 
     cursor.connection.commit()
     return {"message": "Senha temporária enviada para o e-mail do usuário."}

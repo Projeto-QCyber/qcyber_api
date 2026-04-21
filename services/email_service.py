@@ -2,43 +2,35 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import pymysql
-from database import get_cursor
+
+from config import settings
 
 
-def _send_email(to_email: str, subject: str, html_content: str, cursor: pymysql.cursors.DictCursor) -> bool:
+def _send_email(to_email: str, subject: str, html_content: str) -> bool:
     """
-    Função interna e genérica para enviar e-mails.
-    Busca as configurações de SMTP do banco e envia a mensagem com o conteúdo HTML fornecido.
+    Função interna e genérica para enviar e-mails usando SMTP definido no .env.
     """
     try:
-        # Busca as configurações de SMTP no banco de dados
-        cursor.execute("SELECT chave, valor FROM configuracoes WHERE chave LIKE 'SMTP_%'")
-        configs_list = cursor.fetchall()
+        smtp_server = settings.SMTP_SERVER
+        smtp_port = settings.SMTP_PORT
+        smtp_user = settings.SMTP_USER
+        smtp_password = settings.SMTP_PASSWORD
+        sender_name = settings.SMTP_SENDER_NAME or "qCyber Platform"
 
-        # Converte a lista de dicionários para um único dicionário
-        smtp_configs = {item['chave']: item['valor'] for item in configs_list}
-
-        smtp_server = smtp_configs.get('SMTP_SERVER')
-        smtp_port = int(smtp_configs.get('SMTP_PORT', 587))
-        smtp_user = smtp_configs.get('SMTP_USER')
-        smtp_password = smtp_configs.get('SMTP_PASSWORD')
-        sender_name = smtp_configs.get('SMTP_SENDER_NAME', 'qCyber Platform')
-
-        if not all([smtp_server, smtp_port, smtp_user, smtp_password]):
-            print("❌ ERRO: Configurações de SMTP incompletas no banco de dados.")
+        if not all([smtp_server, smtp_user, smtp_password]):
+            print(
+                "❌ ERRO: Configurações de SMTP incompletas. "
+                "Defina SMTP_SERVER, SMTP_USER e SMTP_PASSWORD no .env."
+            )
             return False
 
-        # Cria a mensagem do e-mail
         message = MIMEMultipart("alternative")
         message["Subject"] = subject
         message["From"] = f"{sender_name} <{smtp_user}>"
         message["To"] = to_email
 
-        # Anexa o conteúdo HTML passado como argumento
         message.attach(MIMEText(html_content, "html"))
 
-        # Envia o e-mail
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
             server.login(smtp_user, smtp_password)
@@ -52,7 +44,7 @@ def _send_email(to_email: str, subject: str, html_content: str, cursor: pymysql.
         return False
 
 
-def send_verification_email(to_email: str, code: str, subject: str, cursor: pymysql.cursors.DictCursor):
+def send_verification_email(to_email: str, code: str, subject: str):
     """
     Prepara e envia um e-mail de VERIFICAÇÃO DE CÓDIGO.
     Esta função monta o HTML específico para o código e chama a função de envio principal.
@@ -69,12 +61,11 @@ def send_verification_email(to_email: str, code: str, subject: str, cursor: pymy
     </body>
     </html>
     """
-    return _send_email(to_email, subject, html, cursor)
+    return _send_email(to_email, subject, html)
 
 
-def send_email_html(to_email: str, subject: str, html_content: str, cursor: pymysql.cursors.DictCursor):
+def send_email_html(to_email: str, subject: str, html_content: str):
     """
     Envia um e-mail com um CORPO HTML totalmente personalizado.
-    Esta é a função que você chamará da sua rota de admin.
     """
-    return _send_email(to_email, subject, html_content, cursor)
+    return _send_email(to_email, subject, html_content)

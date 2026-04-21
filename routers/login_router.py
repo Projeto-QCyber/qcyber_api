@@ -51,7 +51,7 @@ def login_for_access_token(
         sql = "UPDATE usuarios SET codigo_verificacao=%s, codigo_verificacao_expiracao=%s, tentativas_verificacao=0 WHERE id=%s"
         cursor.execute(sql, (hashed_code, expiration, user['id']))
 
-        email_service.send_verification_email(user['email'], code, "Seu código de login qCyber", cursor)
+        email_service.send_verification_email(user['email'], code, "Seu código de login qCyber")
         cursor.connection.commit()
 
         # Retorna desafio com token temporário

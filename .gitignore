@@ -1,5 +1,6 @@
 .env*
 .venv*
+.ideia
 
 **__pycache__**
 .env
@@ -7,3 +8,5 @@
 
 nginx/frontend_build
 !**README.md**
+
+mysql_volume

@@ -50,7 +50,6 @@ def create_user(
             to_email=user.email,
             code=verification_code,
             subject="Verifique sua conta qCyber",
-            cursor=cursor
         )
 
         cursor.connection.commit()
@@ -137,7 +136,7 @@ def request_password_reset(
 
         subject = "Redefinição de Senha - Plataforma qCyber"
         email_body = f"Olá {user['nome']},<br><br>Clique no link a seguir para redefinir sua senha: <a href='{reset_link}'>{reset_link}</a>"
-        email_service.send_email_html(user['email'], subject, email_body, cursor)
+        email_service.send_email_html(user['email'], subject, email_body)
 
         cursor.connection.commit()
 

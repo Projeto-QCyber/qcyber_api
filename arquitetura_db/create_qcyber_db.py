@@ -21,7 +21,7 @@ def recreate_database():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
-            port=os.getenv('MYSQL_PORT', '3306'),
+            port=int(os.getenv('MYSQL_PORT', '3306')),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             charset='utf8mb4'
@@ -162,15 +162,7 @@ def recreate_database():
                                valor VARCHAR(255) NOT NULL
                            ) ENGINE=InnoDB;
                            """)
-            configuracoes_padrao = [
-                ('SMTP_SERVER', 'smtp.example.com'),
-                ('SMTP_PORT', '587'),
-                ('SMTP_USER', 'user@example.com'),
-                ('SMTP_PASSWORD', 'password'),
-                ('SMTP_SENDER_NAME', 'qCyber Platform')
-            ]
-            cursor.executemany("INSERT INTO configuracoes (chave, valor) VALUES (%s, %s)", configuracoes_padrao)
-            print("✅ Tabela 'configuracoes' criada e populada com valores padrão.")
+            print("✅ Tabela 'configuracoes' criada (SMTP: variáveis no .env da API).")
 
             conn.commit()
 
@@ -340,7 +332,7 @@ def verify_database():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
-            port=os.getenv('MYSQL_PORT', '3306'),
+            port=int(os.getenv('MYSQL_PORT', '3306')),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=db_name,

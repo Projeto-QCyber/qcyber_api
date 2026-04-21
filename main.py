@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 from config import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,19 +17,24 @@ from routers import (login_router,
 app = FastAPI(
     title="qCyber Security API",
     description="API para monitoramento de segurança e análise de detecções.",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/api/docs" if os.environ.get("API_ENV")=="dev" else None,
+    redoc_url="/api/redoc" if os.environ.get("API_ENV")=="dev" else None,
+    openapi_url="/api/openapi.json" if os.environ.get("API_ENV")=="dev" else None,
+    swagger_ui_parameters={"docExpansion": None}  # fecha as rotas, por padrão
 )
 
 # Configuração do CORS (Cross-Origin Resource Sharing)
+dev_origins = [
+    f"http://localhost:{settings.NGINX_PORT}",  # nginx
+    f"http://127.0.0.1:{settings.NGINX_PORT}",  # nginx
+] if os.environ.get("API_ENV")=="dev" else []
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        f"http://localhost:{settings.NGINX_PORT}",  # nginx
-        f"http://127.0.0.1:{settings.NGINX_PORT}",  # nginx
+        f"http://192.168.1.152:{settings.NGINX_PORT}",  # nginx
         settings.FRONTEND_BASE_URL.replace("/qcyber/", ""),  # removendo a base url do final
-    ],
+    ] + dev_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

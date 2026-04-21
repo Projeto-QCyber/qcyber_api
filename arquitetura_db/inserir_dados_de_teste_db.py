@@ -82,7 +82,7 @@ def seed_data():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
-            port=os.getenv('MYSQL_PORT', '3306'),
+            port=int(os.getenv('MYSQL_PORT', '3306')),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=db_name,

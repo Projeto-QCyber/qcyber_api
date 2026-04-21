@@ -181,14 +181,6 @@ class UserPermissionUpdate(BaseModel):
     is_admin: bool
     tem_permissao_sistema: bool
 
-class SettingsUpdate(BaseModel):
-    """Schema para receber as novas configurações de SMTP."""
-    SMTP_SERVER: str
-    SMTP_PORT: str
-    SMTP_USER: str
-    SMTP_PASSWORD: str
-    SMTP_SENDER_NAME: str
-
 class PasswordResetRequest(BaseModel):
     """Schema para solicitar o reset de senha."""
     email: EmailStr
