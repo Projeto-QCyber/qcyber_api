@@ -1,6 +1,6 @@
 # QCyber Security API
 
-API para monitoramento de segurança desenvolvida com FastAPI. Esta é a "API Principal".
+API para monitoramento de segurança desenvolvida com FastAPI. 
 
 ### Pré-requisitos
 
