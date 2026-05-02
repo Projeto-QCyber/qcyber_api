@@ -6,7 +6,7 @@ import schemas, security
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/api/dispositivos",
+    prefix="/qcyber/api/dispositivos",
     tags=["Dispositivos"],
     dependencies=[Depends(security.oauth2_scheme)]
 )

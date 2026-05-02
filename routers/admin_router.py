@@ -11,7 +11,7 @@ from services import email_service
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/api/admin",
+    prefix="/qcyber/api/admin",
     tags=["Administração"],
     dependencies=[Depends(security.get_current_admin_user)] # Protege todas as rotas neste arquivo
 )

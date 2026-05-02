@@ -13,7 +13,7 @@ from schemas import UserSummary
 from config import settings
 
 router = APIRouter(
-    prefix="/api/usuarios",
+    prefix="/qcyber/api/usuarios",
     tags=["Usuários"]
 )
 
@@ -104,7 +104,7 @@ def verify_user_email(
 def read_users_me(current_user: dict = Depends(security.get_current_user)):
     """Retorna os dados do usuário atualmente autenticado."""
     # O `get_current_user` já retorna um dicionário com os dados do usuário do banco
-    # Apenas retornamos esse dicionário, e o FastAPI/Pydantic cuidará da validação
+    # Apenas retornamos esse dicionário, e o Fastqcyber/api/Pydantic cuidará da validação
     return current_user
 
 

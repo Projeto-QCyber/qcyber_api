@@ -18,9 +18,9 @@ app = FastAPI(
     title="qCyber Security API",
     description="API para monitoramento de segurança e análise de detecções.",
     version="1.0.0",
-    docs_url="/api/docs" if os.environ.get("API_ENV")=="dev" else None,
-    redoc_url="/api/redoc" if os.environ.get("API_ENV")=="dev" else None,
-    openapi_url="/api/openapi.json" if os.environ.get("API_ENV")=="dev" else None,
+    docs_url="/qcyber/api/docs" if os.environ.get("API_ENV")=="dev" else None,
+    redoc_url="/qcyber/api/redoc" if os.environ.get("API_ENV")=="dev" else None,
+    openapi_url="/qcyber/api/openapi.json" if os.environ.get("API_ENV")=="dev" else None,
     swagger_ui_parameters={"docExpansion": None}  # fecha as rotas, por padrão
 )
 

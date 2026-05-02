@@ -19,7 +19,7 @@ from reportlab.lib import colors
 import ast
 
 router = APIRouter(
-    prefix="/api/report",
+    prefix="/qcyber/api/report",
     tags=["Reports"],
     dependencies=[Depends(security.oauth2_scheme)]
 )

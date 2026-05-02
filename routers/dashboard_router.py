@@ -8,7 +8,7 @@ import schemas
 from database import get_cursor
 
 router = APIRouter(
-    prefix="/api/dashboard",
+    prefix="/qcyber/api/dashboard",
     tags=["Dashboard"]
 )
 
