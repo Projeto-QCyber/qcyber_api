@@ -51,4 +51,5 @@ services:
 
 networks:
   qcyber-network:
+    name: qcyber-network
     driver: bridge
