@@ -13,7 +13,7 @@ from schemas import UserSummary
 from config import settings
 
 router = APIRouter(
-    prefix="/qcyberapi/usuarios",
+    prefix="/api/usuarios",
     tags=["Usuários"]
 )
 
