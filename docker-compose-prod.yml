@@ -1,0 +1,57 @@
+services:
+  api-principal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qcyber-prod-main-api:v0.1
+    container_name: qcyber_prod_api_principal
+    restart: always
+    env_file:
+      - .env
+    environment:
+       - MYSQL_HOST=mysql  # sobreescrita
+       - MYSQL_PORT=3306  # sobreescrita
+    networks:
+      - qcyber-network  # mesma rede de containers do repositório QML
+
+
+  mysql:
+    image: mysql:9.5
+    container_name: qcyber_prod_mysql
+    env_file:
+      - .env
+    ports:
+      - "${MYSQL_PORT}:3306"  # na raiz, funciona apenas com: docker compose --env-file=backend/.env up -d mysql
+    volumes:
+      - ./mysql_volume:/var/lib/mysql  # em produção faz mais sentido usar volumes gerenciados pelo docker
+    restart: unless-stopped
+    networks:
+      - qcyber-network
+
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.nginx
+    image: qcyber-prod-nginx
+    container_name: qcyber_prod_nginx
+    env_file:
+      - .env
+    ports:
+      - "${NGINX_PORT}:80"
+      # - "443:443"  # não necessária se o Haproxy for "https terminator"
+    depends_on:
+      - api-principal
+    restart: always
+    networks:
+      - qcyber-network
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # .conf da clausula http do nginx + clausula server da aplicação
+      - ./nginx/frontend_build:/var/www:ro
+
+
+
+networks:
+  qcyber-network:
+    name: qcyber-network
+    driver: bridge
