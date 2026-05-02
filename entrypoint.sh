@@ -18,4 +18,5 @@ PY
 
 
 # Substitua 'main:app' pelo caminho real do seu arquivo e da sua instância Fastapi.
-python -m uvicorn main:app --host 0.0.0.0 --port $MAIN_API_PORT
+# Substitua o forwarded-allow-ips pela mascara da rede qcyber-network. Isso evita mixed-content.
+python -m uvicorn main:app --host 0.0.0.0 --port $MAIN_API_PORT  --proxy-headers --forwarded-allow-ips=172.18.0.0/16

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 # =================================
 #       AUTENTICAÇÃO E USUÁRIOS
@@ -94,7 +94,8 @@ class IncidentDetail(DetectionHistoryItem):
     dispositivo_id: int
     resumo_tecnico: Optional[str] = "N/A"
     explicacao_llm: Optional[str] = "Análise detalhada não disponível."
-    acoes_recomendadas: Optional[list[str]] = []
+    # acoes_recomendadas: Optional[list[str]] = []  # antigo -> erro de validação 
+    acoes_recomendadas: Optional[Dict[str, Any]] = None
     nivel_risco: Optional[str] = "Desconhecido"
 
     class Config:

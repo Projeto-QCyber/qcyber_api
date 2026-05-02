@@ -63,6 +63,46 @@ def get_history_by_threat(threat_type_id: int, cursor: pymysql.cursors.DictCurso
     return cursor.fetchall()
 
 
+# @router.get("/incident-detail/{detection_id}", response_model=schemas.IncidentDetail)
+# def get_incident_detail(detection_id: int, cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
+#     query = """
+#             SELECT d.id, 
+#                  disp.id as dispositivo_id,
+#                    d.data_deteccao, 
+#                    eta.nome  AS tipo_ataque, 
+#                    disp.nome AS nome_dispositivo, 
+#                    esr.nome  AS status_resposta, 
+#                    ia.resumo_tecnico, 
+#                    ia.explicacao_llm, 
+#                    ia.acoes_recomendadas, 
+#                    enr.nome  as nivel_risco
+#             FROM deteccoes d
+#                      JOIN dispositivos disp ON d.dispositivo_id = disp.id
+#                      JOIN enum_tipo_ataque eta ON d.tipo_ataque_id = eta.id
+#                      JOIN enum_status_resposta esr ON d.status_resposta_id = esr.id
+#                      LEFT JOIN incidentes_analisados ia 
+#                                ON d.incidente_id = ia.id
+#                      LEFT JOIN enum_nivel_risco enr ON ia.nivel_risco_id = enr.id
+#             WHERE d.id = %s; 
+#             """
+#     cursor.execute(query, (detection_id,))
+#     result = cursor.fetchone()
+#     if not result:
+#         raise HTTPException(status_code=404, detail="Detecção não encontrada.")
+
+#     # Converte a string de ações para uma lista, se necessário
+#     raw_actions = result.get("acoes_recomendadas")
+#     if raw_actions and isinstance(raw_actions, str):
+#         try:
+#             # Tenta decodificar como JSON primeiro
+#             result["acoes_recomendadas"] = json.loads(raw_actions)
+#         except json.JSONDecodeError:
+#             # Se falhar, faz split por um delimitador
+#             result["acoes_recomendadas"] = [act.strip() for act in raw_actions.split('•') if act.strip()]
+
+#     return result
+
+
 @router.get("/incident-detail/{detection_id}", response_model=schemas.IncidentDetail)
 def get_incident_detail(detection_id: int, cursor: pymysql.cursors.DictCursor = Depends(get_cursor)):
     query = """
@@ -90,14 +130,34 @@ def get_incident_detail(detection_id: int, cursor: pymysql.cursors.DictCursor = 
     if not result:
         raise HTTPException(status_code=404, detail="Detecção não encontrada.")
 
-    # Converte a string de ações para uma lista, se necessário
+    # Converte a string de ações para dicionário, tratando formatação do LLM
     raw_actions = result.get("acoes_recomendadas")
     if raw_actions and isinstance(raw_actions, str):
+        cleaned_actions = raw_actions.strip()
+        
+        # Limpeza de blocos de código markdown (ex: ```json ... ```) gerados pela LLM
+        if cleaned_actions.startswith("```"):
+            lines = cleaned_actions.splitlines()
+            # Remove a primeira linha se for o início do bloco (ex: ```json)
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remove a última linha se for o fechamento do bloco (```)
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            # Remonta a string limpa
+            cleaned_actions = "\n".join(lines).strip()
+
         try:
-            # Tenta decodificar como JSON primeiro
-            result["acoes_recomendadas"] = json.loads(raw_actions)
+            # Tenta decodificar como JSON agora que está limpo
+            result["acoes_recomendadas"] = json.loads(cleaned_actions)
         except json.JSONDecodeError:
-            # Se falhar, faz split por um delimitador
-            result["acoes_recomendadas"] = [act.strip() for act in raw_actions.split('•') if act.strip()]
+            # Se ainda assim falhar (a LLM não gerou JSON), 
+            # tenta o fallback, mas adequando ao schema que agora é um dict
+            fallback_list = [act.strip() for act in cleaned_actions.split('•') if act.strip()]
+            result["acoes_recomendadas"] = {"remediation_suggestions": fallback_list}
+    else:
+        # Garante que não retorne nulo e quebre o dict do schema
+        if not result.get("acoes_recomendadas"):
+            result["acoes_recomendadas"] = {}
 
     return result
