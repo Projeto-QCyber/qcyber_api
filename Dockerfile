@@ -33,6 +33,4 @@ COPY . .
 EXPOSE 8000
 
 # Comando para iniciar o servidor Uvicorn com o Gunicorn (recomendado para produção)
-# Substitua 'main:app' pelo caminho real do seu arquivo e da sua instância Fastapi.
-# Exemplo: Se sua aplicação está em 'src/api.py' e a instância é 'app', use 'src.api:app'
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT [ "/app/entrypoint.sh" ]

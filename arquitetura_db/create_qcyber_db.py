@@ -12,7 +12,7 @@ def recreate_database():
     """Recria o banco de dados qcyber_db completamente."""
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DB', 'qcyber_db')
+    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
 
     print("=" * 60)
     print("CRIAÇÃO DA ESTRUTURA DO BANCO DE DADOS - PROJETO QCYBER")
@@ -55,9 +55,22 @@ def recreate_database():
                            ) ENGINE=InnoDB;
                            """)
             label_map = {
-                'Backdoor': 0, 'DDoS_HTTP': 1, 'DDoS_ICMP': 2, 'DDoS_TCP': 3, 'DDoS_UDP': 4,
-                'Fingerprinting': 5, 'MITM': 6, 'Password': 7, 'Port_Scanning': 8, 'Ransomware': 9,
-                'SQL_injection': 10, 'Uploading': 11, 'Vulnerability_scanner': 12, 'XSS': 13, 'Normal': 99
+                'Backdoor': 0,
+                'DDoS_HTTP': 1,
+                'DDoS_ICMP': 2,
+                'DDoS_TCP': 3,
+                'DDoS_UDP': 4,
+                'Fingerprinting': 5,
+                'MITM': 6,
+                'Password': 7,
+                'Port_Scanning': 8,
+                'Ransomware': 9,
+                'SQL_injection': 10,
+                'Uploading': 11,
+                'Vulnerability_scanner': 12,
+                'XSS': 13,
+                'Others': 14,
+                'Normal': 99,
             }
             for nome, id_ataque in label_map.items():
                 cursor.execute("INSERT INTO enum_tipo_ataque (id, nome, descricao) VALUES (%s, %s, %s)",
@@ -327,7 +340,7 @@ def verify_database():
     print("\nPASSO 5: Verificando a estrutura do banco de dados...")
 
     load_dotenv()
-    db_name = os.getenv('MYSQL_DB', 'qcyber_db')
+    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
 
     try:
         conn = pymysql.connect(
@@ -351,6 +364,92 @@ def verify_database():
         return True
     except Exception as e:
         print(f"❌ ERRO na verificação: {e}")
+        return False
+
+
+def ensure_bootstrap():
+    """Garante que o banco e o esquema mínimo existam.
+    - Cria o DB se não existir.
+    - Se tabelas críticas estiverem ausentes, chama recreate_database().
+    Retorna True em sucesso, False caso contrário.
+    """
+    load_dotenv()
+    db_name = os.getenv('MYSQL_DATABASE', 'qcyber_db')
+    app_env = (os.getenv("APP_ENV") or os.getenv("FLASK_ENV") or "development").strip().lower()
+    try:
+        _host = os.getenv('MYSQL_HOST') or 'mysql'
+        _user = os.getenv('MYSQL_USER') or os.getenv('MYSQL_USERNAME') or 'root'
+        _pass = os.getenv('MYSQL_PASSWORD') or os.getenv('MYSQL_ROOT_PASSWORD') or 'root'
+        print(f"[DB-BS] Conectando para bootstrap host={_host} user={_user}")
+        conn = pymysql.connect(
+            host=_host,
+            user=_user,
+            password=_pass,
+            charset='utf8mb4'
+        )
+        with conn.cursor() as cursor:
+            # Toma um lock para evitar corrida entre múltiplos workers
+            cursor.execute("SELECT GET_LOCK(%s, 30)", ("qcyber_bootstrap_lock",))
+            got_lock = cursor.fetchone()[0] == 1
+            try:
+                # Garante existência do DB
+                cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                cursor.execute(f"USE {db_name}")
+
+                # Verifica se tabelas críticas existem
+                cursor.execute(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=%s AND table_name IN ("\
+                    "'enum_status_resposta','enum_tipo_ataque','dispositivos','deteccoes')",
+                    (db_name,)
+                )
+                critical_present = cursor.fetchone()[0]
+
+                if critical_present < 4 and got_lock:
+                    if app_env in {"production", "prod"}:
+                        print("❌ Estrutura crítica ausente e APP_ENV=production. Recusando recriar banco automaticamente.")
+                        cursor.execute("SELECT RELEASE_LOCK(%s)", ("qcyber_bootstrap_lock",))
+                        got_lock = False
+                        conn.close()
+                        return False
+                    print("⚠️ Estrutura crítica ausente. Recriando banco de dados (ambiente de dev/test)...")
+                    # Libera lock antes de recriar para evitar reentrância após drop
+                    cursor.execute("SELECT RELEASE_LOCK(%s)", ("qcyber_bootstrap_lock",))
+                    got_lock = False
+                    conn.close()
+                    return recreate_database()
+
+                # Verificações/patches pontuais de colunas críticas
+                # 1) deteccoes.predicao
+                cursor.execute(
+                    "SELECT COUNT(*) FROM information_schema.columns "
+                    "WHERE table_schema=%s AND table_name='deteccoes' AND column_name='predicao'",
+                    (db_name,)
+                )
+                pred_col_present = cursor.fetchone()[0] == 1
+                if not pred_col_present and got_lock:
+                    print("⚠️ Coluna 'predicao' ausente em 'deteccoes'. Aplicando patch de schema...")
+                    cursor.execute("ALTER TABLE deteccoes ADD COLUMN predicao INT NOT NULL DEFAULT 1 AFTER dispositivo_id")
+
+                if got_lock:
+                    cursor.execute(
+                        "INSERT IGNORE INTO enum_tipo_ataque (id, nome, descricao) "
+                        "VALUES (%s, %s, %s)",
+                        (14, "Others", "Detecção do tipo Others."),
+                    )
+                    cursor.execute(
+                        "INSERT IGNORE INTO enum_tipo_ataque (id, nome, descricao) "
+                        "VALUES (%s, %s, %s)",
+                        (99, "Normal", "Detecção do tipo Normal."),
+                    )
+
+                conn.commit()
+            finally:
+                if got_lock:
+                    cursor.execute("SELECT RELEASE_LOCK(%s)", ("qcyber_bootstrap_lock",))
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Falha ao garantir bootstrap do banco: {e}")
         return False
 
 

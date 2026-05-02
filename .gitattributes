@@ -1,0 +1,7 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+
+# Unix
+*.sh		text eol=lf
+nginx/*.conf     text eol=lf
