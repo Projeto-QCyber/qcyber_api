@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: qcyber-prod-main-api:v0.1
+    image: qcyber-prod-main-api:v2.0.0-aef5d8b
     container_name: qcyber_prod_api_principal
     restart: always
     env_file:
