@@ -14,7 +14,7 @@ load_dotenv()
 # --- CONFIGURAÇÕES ---
 # Endereço da sua nova API de análise (rodando no desktop)
 # API_ANALISE_URL = "http://192.168.1.68:5000/analisar"
-API_ANALISE_URL = "http://127.0.0.1:5000/analisar"
+API_ANALISE_URL = "http://127.0.0.1:8016/analisar"
 DATA_PATH = "../data/dados_de_teste.csv"
 tempoi=10 #segundos
 tempof=20 #sengundos
@@ -26,7 +26,7 @@ def get_db_connection():
     try:
         conn = pymysql.connect(
             host=os.getenv('MYSQL_HOST', 'localhost'),
-            port=os.getenv('MYSQL_PORT', '3306'),
+            port=int(os.getenv('MYSQL_PORT', '3306')),
             user=os.getenv('MYSQL_USER', 'root'),
             password=os.getenv('MYSQL_PASSWORD', 'root'),
             database=os.getenv('MYSQL_DATABASE', 'qcyber_db'),

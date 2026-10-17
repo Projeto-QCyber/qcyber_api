@@ -1,5 +1,5 @@
 # /history_router.py
-from typing import List
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 import pymysql
 import json
@@ -11,6 +11,55 @@ router = APIRouter(
     tags=["History"],
     dependencies=[Depends(security.oauth2_scheme)]
 )
+
+
+def _normalize_acoes_recomendadas(raw_actions: Any) -> Dict[str, Any]:
+    """Garante que acoes_recomendadas seja sempre um dict (schema IncidentDetail).
+
+    Formatos aceitos no banco:
+    - dict novo (incident_response_plans / remediation_suggestions)
+    - lista legada de strings (simulador / carga)
+    - string JSON (com ou sem bloco ```json)
+    """
+    if not raw_actions:
+        return {}
+
+    if isinstance(raw_actions, str):
+        cleaned_actions = raw_actions.strip()
+
+        if cleaned_actions.startswith("```"):
+            lines = cleaned_actions.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
+            cleaned_actions = "\n".join(lines).strip()
+
+        try:
+            raw_actions = json.loads(cleaned_actions)
+        except json.JSONDecodeError:
+            fallback_list = [act.strip() for act in cleaned_actions.split("•") if act.strip()]
+            return {
+                "remediation_suggestions": [
+                    {"suggestion": s, "attack_type_label": "Geral"} for s in fallback_list
+                ]
+            }
+
+    if isinstance(raw_actions, list):
+        suggestions: List[Dict[str, Any]] = []
+        for item in raw_actions:
+            if isinstance(item, str) and item.strip():
+                suggestions.append(
+                    {"suggestion": item.strip(), "attack_type_label": "Geral"}
+                )
+            elif isinstance(item, dict):
+                suggestions.append(item)
+        return {"remediation_suggestions": suggestions}
+
+    if isinstance(raw_actions, dict):
+        return raw_actions
+
+    return {}
 
 
 @router.get("/filter/devices", response_model=List[schemas.FilterItem])
@@ -130,34 +179,8 @@ def get_incident_detail(detection_id: int, cursor: pymysql.cursors.DictCursor = 
     if not result:
         raise HTTPException(status_code=404, detail="Detecção não encontrada.")
 
-    # Converte a string de ações para dicionário, tratando formatação do LLM
-    raw_actions = result.get("acoes_recomendadas")
-    if raw_actions and isinstance(raw_actions, str):
-        cleaned_actions = raw_actions.strip()
-        
-        # Limpeza de blocos de código markdown (ex: ```json ... ```) gerados pela LLM
-        if cleaned_actions.startswith("```"):
-            lines = cleaned_actions.splitlines()
-            # Remove a primeira linha se for o início do bloco (ex: ```json)
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
-            # Remove a última linha se for o fechamento do bloco (```)
-            if lines and lines[-1].strip().startswith("```"):
-                lines = lines[:-1]
-            # Remonta a string limpa
-            cleaned_actions = "\n".join(lines).strip()
-
-        try:
-            # Tenta decodificar como JSON agora que está limpo
-            result["acoes_recomendadas"] = json.loads(cleaned_actions)
-        except json.JSONDecodeError:
-            # Se ainda assim falhar (a LLM não gerou JSON), 
-            # tenta o fallback, mas adequando ao schema que agora é um dict
-            fallback_list = [act.strip() for act in cleaned_actions.split('•') if act.strip()]
-            result["acoes_recomendadas"] = {"remediation_suggestions": fallback_list}
-    else:
-        # Garante que não retorne nulo e quebre o dict do schema
-        if not result.get("acoes_recomendadas"):
-            result["acoes_recomendadas"] = {}
+    result["acoes_recomendadas"] = _normalize_acoes_recomendadas(
+        result.get("acoes_recomendadas")
+    )
 
     return result
